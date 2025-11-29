@@ -78,7 +78,7 @@
         <div class="bg-white rounded-xl shadow-2xl w-[450px] p-6 animate-in fade-in zoom-in duration-200">
             <div class="flex justify-between items-center mb-6 border-b border-slate-100 pb-4">
                 <h3 class="font-bold text-lg text-slate-800">Programar Bloque</h3>
-                <button onclick="document.getElementById('modal-add-block').classList.add('hidden')" class="text-slate-400 hover:text-slate-600">
+                <button onclick="closeAddBlockModal()" class="text-slate-400 hover:text-slate-600">
                     <i data-lucide="x" class="w-5 h-5"></i>
                 </button>
             </div>
@@ -115,30 +115,37 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Día</label>
-                        <select id="block-day" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
-                            <option value="lunes">Lunes</option>
-                            <option value="martes">Martes</option>
-                            <option value="miercoles">Miércoles</option>
-                            <option value="jueves">Jueves</option>
-                            <option value="viernes">Viernes</option>
-                            <option value="sabado">Sábado</option>
-                        </select>
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-xs font-bold text-slate-500 uppercase">Día y Módulo</label>
+                        <button onclick="addDayModuleRow()" class="bg-purple-100 hover:bg-purple-200 text-purple-700 p-1.5 rounded transition" title="Añadir otro día">
+                            <i data-lucide="plus" class="w-4 h-4"></i>
+                        </button>
                     </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Módulo</label>
-                        <select id="block-mod" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
-                            <option value="1">M1 (08:00 - 09:20)</option>
-                            <option value="2">M2 (09:30 - 10:50)</option>
-                            <option value="3">M3 (11:00 - 12:20)</option>
-                            <option value="4">M4 (12:30 - 13:50)</option>
-                            <option value="5">M5 (14:00 - 15:20)</option>
-                            <option value="6">M6 (15:30 - 16:50)</option>
-                            <option value="7">M7 (17:00 - 18:20)</option>
-                            <option value="8">M8 (18:30 - 19:50)</option>
-                        </select>
+                    <div id="day-module-container" class="space-y-2">
+                        <div class="day-module-row grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                            <select class="block-day w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+                                <option value="lunes">Lunes</option>
+                                <option value="martes">Martes</option>
+                                <option value="miercoles">Miércoles</option>
+                                <option value="jueves">Jueves</option>
+                                <option value="viernes">Viernes</option>
+                                <option value="sabado">Sábado</option>
+                            </select>
+                            <select class="block-mod w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+                                <option value="1">M1 (08:00 - 09:20)</option>
+                                <option value="2">M2 (09:30 - 10:50)</option>
+                                <option value="3">M3 (11:00 - 12:20)</option>
+                                <option value="4">M4 (12:30 - 13:50)</option>
+                                <option value="5">M5 (14:00 - 15:20)</option>
+                                <option value="6">M6 (15:30 - 16:50)</option>
+                                <option value="7">M7 (17:00 - 18:20)</option>
+                                <option value="8">M8 (18:30 - 19:50)</option>
+                            </select>
+                            <button onclick="removeDayModuleRow(this)" class="text-slate-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50 transition opacity-0 pointer-events-none" title="Eliminar">
+                                <i data-lucide="x" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 

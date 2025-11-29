@@ -469,42 +469,157 @@ async function submitNewBlock() {
     // Validamos NRC y Sección en vez de nombre
     const nrc = document.getElementById('block-nrc').value;
     const sec = document.getElementById('block-sec').value.toUpperCase();
-    const day = document.getElementById('block-day').value;
-    const mod = document.getElementById('block-mod').value;
     const type = document.getElementById('block-type').value;
 
     if(!nrc || !sec) { alert("NRC y Sección son obligatorios"); return; }
 
+    // Obtener todos los días y módulos seleccionados
+    const dayModuleRows = document.querySelectorAll('.day-module-row');
+    const blocks = [];
+    
+    dayModuleRows.forEach(row => {
+        const day = row.querySelector('.block-day').value;
+        const mod = row.querySelector('.block-mod').value;
+        blocks.push({ dia: day, modulo: mod });
+    });
+
+    if (blocks.length === 0) {
+        alert("Debe seleccionar al menos un día y módulo");
+        return;
+    }
+
     try {
-        const res = await fetch('/add_block', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                career_code: code,
-                malla: malla,
-                semestre: sem,
-                dia: day,
-                modulo: mod,
-                // Ya no enviamos 'asignatura' (nombre)
-                nrc: nrc,
-                seccion: sec,
-                tipo: type
-            })
-        });
-        
-        const json = await res.json();
-        if(json.success) {
-            careerDatabase = json.data; 
-            renderCareerGrid(); 
-            document.getElementById('modal-add-block').classList.add('hidden');
-            document.getElementById('block-nrc').value = '';
-            document.getElementById('block-sec').value = '';
-            // Resetear lista de NRC disponibles según la nueva data
-            buildNrcOptions();
-        } else {
-            alert("Error: " + json.error);
+        // Enviar todos los bloques
+        for (const block of blocks) {
+            const res = await fetch('/add_block', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    career_code: code,
+                    malla: malla,
+                    semestre: sem,
+                    dia: block.dia,
+                    modulo: block.modulo,
+                    nrc: nrc,
+                    seccion: sec,
+                    tipo: type
+                })
+            });
+            
+            const json = await res.json();
+            if(!json.success) {
+                alert(`Error en ${block.dia} M${block.modulo}: ${json.error}`);
+                return;
+            }
+            careerDatabase = json.data;
         }
-    } catch(e) { alert("Error de conexión"); }
+        
+        // Si todo fue exitoso
+        renderCareerGrid(); 
+        closeAddBlockModal();
+        buildNrcOptions();
+    } catch(e) { 
+        alert("Error de conexión"); 
+    }
+}
+
+function closeAddBlockModal() {
+    document.getElementById('modal-add-block').classList.add('hidden');
+    document.getElementById('block-nrc').value = '';
+    document.getElementById('block-sec').value = '';
+    
+    // Resetear a una sola fila de día/módulo
+    const container = document.getElementById('day-module-container');
+    container.innerHTML = `
+        <div class="day-module-row grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+            <select class="block-day w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+                <option value="lunes">Lunes</option>
+                <option value="martes">Martes</option>
+                <option value="miercoles">Miércoles</option>
+                <option value="jueves">Jueves</option>
+                <option value="viernes">Viernes</option>
+                <option value="sabado">Sábado</option>
+            </select>
+            <select class="block-mod w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+                <option value="1">M1 (08:00 - 09:20)</option>
+                <option value="2">M2 (09:30 - 10:50)</option>
+                <option value="3">M3 (11:00 - 12:20)</option>
+                <option value="4">M4 (12:30 - 13:50)</option>
+                <option value="5">M5 (14:00 - 15:20)</option>
+                <option value="6">M6 (15:30 - 16:50)</option>
+                <option value="7">M7 (17:00 - 18:20)</option>
+                <option value="8">M8 (18:30 - 19:50)</option>
+            </select>
+            <button onclick="removeDayModuleRow(this)" class="text-slate-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50 transition opacity-0 pointer-events-none" title="Eliminar">
+                <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+        </div>
+    `;
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+function addDayModuleRow() {
+    const container = document.getElementById('day-module-container');
+    const newRow = document.createElement('div');
+    newRow.className = 'day-module-row grid grid-cols-[1fr_1fr_auto] gap-2 items-center';
+    newRow.innerHTML = `
+        <select class="block-day w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+            <option value="lunes">Lunes</option>
+            <option value="martes">Martes</option>
+            <option value="miercoles">Miércoles</option>
+            <option value="jueves">Jueves</option>
+            <option value="viernes">Viernes</option>
+            <option value="sabado">Sábado</option>
+        </select>
+        <select class="block-mod w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 bg-white">
+            <option value="1">M1 (08:00 - 09:20)</option>
+            <option value="2">M2 (09:30 - 10:50)</option>
+            <option value="3">M3 (11:00 - 12:20)</option>
+            <option value="4">M4 (12:30 - 13:50)</option>
+            <option value="5">M5 (14:00 - 15:20)</option>
+            <option value="6">M6 (15:30 - 16:50)</option>
+            <option value="7">M7 (17:00 - 18:20)</option>
+            <option value="8">M8 (18:30 - 19:50)</option>
+        </select>
+        <button onclick="removeDayModuleRow(this)" class="text-slate-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50 transition" title="Eliminar">
+            <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+    `;
+    container.appendChild(newRow);
+    
+    // Actualizar botones de eliminar: mostrar solo si hay más de una fila
+    updateRemoveButtons();
+    
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+function removeDayModuleRow(btn) {
+    const row = btn.closest('.day-module-row');
+    const container = document.getElementById('day-module-container');
+    
+    // No permitir eliminar si solo hay una fila
+    if (container.querySelectorAll('.day-module-row').length > 1) {
+        row.remove();
+        updateRemoveButtons();
+    }
+}
+
+function updateRemoveButtons() {
+    const container = document.getElementById('day-module-container');
+    const rows = container.querySelectorAll('.day-module-row');
+    const removeButtons = container.querySelectorAll('.day-module-row button');
+    
+    removeButtons.forEach(btn => {
+        if (rows.length > 1) {
+            btn.classList.remove('opacity-0', 'pointer-events-none');
+        } else {
+            btn.classList.add('opacity-0', 'pointer-events-none');
+        }
+    });
 }
 
 // --- EDITAR / ELIMINAR BLOQUES DESDE EL HORARIO ---
