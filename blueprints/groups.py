@@ -41,16 +41,63 @@ def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def normalize_time_format(time_str: str) -> str:
+    """Convierte '800' a '08:00', '1230' a '12:30', etc."""
+    time_str = time_str.strip().replace(".0", "")
+    if not time_str:
+        return ""
+    
+    # Si ya tiene formato correcto, devolverlo
+    if ":" in time_str:
+        return time_str
+    
+    # Intentar parsear formato sin dos puntos
+    if len(time_str) == 3:  # Ej: "800" -> "08:00"
+        return f"0{time_str[0]}:{time_str[1:3]}"
+    elif len(time_str) == 4:  # Ej: "1230" -> "12:30"
+        return f"{time_str[0:2]}:{time_str[2:4]}"
+    
+    return time_str
+
+
+def get_module_from_time(time_str: str) -> int:
+    """Mapea hora de inicio a número de módulo (1-8)"""
+    time_str = normalize_time_format(time_str)
+    
+    if time_str.startswith("08:00") or time_str.startswith("8:00"):
+        return 1
+    elif time_str.startswith("09:30") or time_str.startswith("9:30"):
+        return 2
+    elif time_str.startswith("11:00"):
+        return 3
+    elif time_str.startswith("12:30"):
+        return 4
+    elif time_str.startswith("14:00"):
+        return 5
+    elif time_str.startswith("15:30"):
+        return 6
+    elif time_str.startswith("17:00"):
+        return 7
+    elif time_str.startswith("18:30"):
+        return 8
+    else:
+        return 0
+
+
 def parse_groups_row(row: pd.Series):
     entries = []
     days = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
 
-    inicio = str(row.get("inicio", "")).strip().replace(".0", "")
-    fin = str(row.get("fin", "")).strip().replace(".0", "")
+    inicio_raw = str(row.get("inicio", "")).strip().replace(".0", "")
+    fin_raw = str(row.get("fin", "")).strip().replace(".0", "")
+    inicio = normalize_time_format(inicio_raw)
+    fin = normalize_time_format(fin_raw)
     horario_texto = f"{inicio} - {fin}" if inicio or fin else ""
+    modulo = get_module_from_time(inicio)
 
     nombre_asignatura = str(row.get("nombre_asignatura", "Sin Nombre")).strip()
     codigo_materia = str(row.get("codigo_materia", "")).strip()
+    ubicacion = str(row.get("ubicacion", "")).strip()
     nrc = str(row.get("nrc", "")).strip().replace(".0", "")
     seccion = str(row.get("seccion", "")).strip()
     carrera = str(row.get("carrera", "")).strip()
@@ -72,6 +119,7 @@ def parse_groups_row(row: pd.Series):
                     {
                         "materia": nombre_asignatura,
                         "codigo_materia": codigo_materia,
+                        "ubicacion": ubicacion,
                         "carrera": carrera,
                         "nrc": nrc,
                         "seccion": seccion,
@@ -80,6 +128,7 @@ def parse_groups_row(row: pd.Series):
                         "tipo": componente,
                         "dia_norm": day,
                         "horario_texto": horario_texto,
+                        "modulo": modulo,
                         "vacantes": vacantes,
                         "ni_an": ni_an,
                     }

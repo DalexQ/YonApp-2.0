@@ -2,11 +2,11 @@
 <section id="tab-career-groups" class="view-section hidden space-y-6 h-full flex flex-col">
     <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
         <div>
-            <h2 class="text-xl font-bold text-slate-800">Grupos de Horario (1° Año)</h2>
+            <h2 class="text-xl font-bold text-slate-800">Bloques de Horario (1° Año)</h2>
             <p class="text-sm text-slate-500">Generación automática basada en NRCs de Nuevo Ingreso (NI).</p>
         </div>
         <div class="flex items-center gap-3">
-            <!-- Subida independiente de Excel para Grupos 1° Año, estilo dropzone como Salas -->
+            <!-- Subida independiente de Excel para Bloques 1° Año, estilo dropzone como Salas -->
             <form id="groups-upload-form" class="flex items-center gap-2" onsubmit="event.preventDefault(); initGroupsView();">
                 <div class="relative bg-white border-2 border-dashed border-slate-300 hover:border-purple-500 transition rounded-xl px-4 py-3 cursor-pointer text-xs text-slate-600 flex items-center gap-2">
                     <input type="file" name="file" accept=".xlsx,.xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="onGroupsFileChange(event)" />
@@ -37,7 +37,39 @@
             <div class="bg-slate-100 p-4 rounded-full mb-3">
                 <i data-lucide="users" class="w-10 h-10 opacity-50"></i>
             </div>
-            <p>Selecciona una carrera arriba para ver sus grupos.</p>
+            <p>Selecciona una carrera arriba para ver sus bloques.</p>
         </div>
     </div>
 </section>
+
+<!-- Modal Horario de Bloque -->
+<div id="modal-group-timetable" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl p-6 flex flex-col">
+        <div class="flex justify-between items-center mb-4 border-b border-slate-200 pb-3">
+            <div>
+                <h3 id="group-timetable-title" class="text-lg font-bold text-slate-800">Horario Bloque</h3>
+                <p id="group-timetable-subtitle" class="text-xs text-slate-500"></p>
+            </div>
+            <button onclick="closeGroupTimetableModal()" class="text-slate-400 hover:text-slate-700 transition p-1 rounded hover:bg-slate-100">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-auto text-xs border-collapse mx-auto">
+                <thead>
+                    <tr class="bg-slate-800 text-white text-center">
+                        <th class="p-2 border border-slate-700 w-20">Módulo</th>
+                        <th class="p-2 border border-slate-700 w-28">Lunes</th>
+                        <th class="p-2 border border-slate-700 w-28">Martes</th>
+                        <th class="p-2 border border-slate-700 w-28">Miércoles</th>
+                        <th class="p-2 border border-slate-700 w-28">Jueves</th>
+                        <th class="p-2 border border-slate-700 w-28">Viernes</th>
+                        <th class="p-2 border border-slate-700 w-28">Sábado</th>
+                    </tr>
+                </thead>
+                <tbody id="group-timetable-grid"></tbody>
+            </table>
+        </div>
+    </div>
+</div>

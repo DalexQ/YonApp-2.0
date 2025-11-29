@@ -1,6 +1,7 @@
-// groups.js - Lógica para Generador de Grupos (1° Año)
+// groups.js - Lógica para Generador de Bloques (1° Año)
 
 let globalGroupsData = null;
+let globalBuiltGroups = [];
 
 function onGroupsFileChange(e) {
     const fileInput = e.target;
@@ -30,7 +31,7 @@ function onGroupsFileChange(e) {
 }
 
 async function initGroupsView() {
-    console.log("--- Iniciando Vista de Grupos (1° Año) ---");
+    console.log("--- Iniciando Vista de Bloques (1° Año) ---");
 
     const selector = document.getElementById('groups-career-selector');
     if (!selector) return;
@@ -41,13 +42,13 @@ async function initGroupsView() {
         return;
     }
 
-    // Solicitar Excel específico para grupos 1° año
+    // Solicitar Excel específico para bloques 1° año
     // Se asume que el usuario ya subió un Excel a través de un formulario
     // con id="groups-upload-form" y un input type="file" con name="file".
     const form = document.getElementById('groups-upload-form');
     if (!form) {
-        console.warn('No se encontró el formulario de subida para grupos (groups-upload-form).');
-        selector.innerHTML = '<option value="">-- Configurar subida de Excel para Grupos --</option>';
+        console.warn('No se encontró el formulario de subida para bloques (groups-upload-form).');
+        selector.innerHTML = '<option value="">-- Configurar subida de Excel para Bloques --</option>';
         return;
     }
 
@@ -70,7 +71,7 @@ async function initGroupsView() {
         const json = await resp.json();
         if (typeof toggleLoading === 'function') toggleLoading(false);
         if (!json.success) {
-            console.error('Error al procesar Excel de grupos:', json.error);
+            console.error('Error al procesar Excel de bloques:', json.error);
             selector.innerHTML = '<option value="">-- Error al procesar Excel --</option>';
             return;
         }
@@ -84,7 +85,7 @@ async function initGroupsView() {
         populateCareerSelector(globalGroupsData.schedule_ni);
     } catch (err) {
         if (typeof toggleLoading === 'function') toggleLoading(false);
-        console.error('Error de red al subir Excel de grupos:', err);
+        console.error('Error de red al subir Excel de bloques:', err);
         selector.innerHTML = '<option value="">-- Error de red al subir Excel --</option>';
     }
 }
@@ -148,15 +149,17 @@ function generateStudentGroups() {
         container.innerHTML = `<div class="p-8 text-slate-500">No se encontraron asignaturas de primer año (ni) para ${career}.</div>`;
         return;
     }
-    // 2. Construir grupos de alumnos basados en vacantes y choques de horario
+    // 2. Construir bloques de alumnos basados en vacantes y choques de horario
     const builtGroups = buildGroupsForCareer(rawBlocks);
 
+    globalBuiltGroups = builtGroups;
+
     if (builtGroups.length === 0) {
-        container.innerHTML = `<div class="p-8 text-slate-500">No fue posible construir grupos para ${career}.</div>`;
+        container.innerHTML = `<div class="p-8 text-slate-500">No fue posible construir bloques para ${career}.</div>`;
         return;
     }
 
-    // 3. Renderizar grupos construidos
+    // 3. Renderizar bloques construidos
     builtGroups.forEach((group, idx) => {
         const groupBlocks = group.blocks;
         const groupSize = group.size;
@@ -168,7 +171,7 @@ function generateStudentGroups() {
         });
 
         const colDiv = document.createElement('div');
-        colDiv.className = "w-80 flex-shrink-0 flex flex-col bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden";
+        colDiv.className = "w-80 flex-shrink-0 flex flex-col bg-white rounded-xl shadow-md border border-slate-200 overflow-hidden hover:shadow-lg transition-shadow";
 
         let blocksHtml = '';
         groupBlocks.forEach(b => {
@@ -194,9 +197,9 @@ function generateStudentGroups() {
         });
 
         colDiv.innerHTML = `
-            <div class="bg-slate-800 text-white p-4 border-b border-slate-700">
+            <div class="bg-slate-800 text-white p-4 border-b border-slate-700 cursor-pointer hover:bg-slate-900/90" onclick="showGroupTimetable(${idx})">
                 <div class="flex justify-between items-center">
-                    <h3 class="font-bold text-lg">Grupo ${idx + 1}</h3>
+                    <h3 class="font-bold text-lg">Bloque ${idx + 1}</h3>
                     <span class="bg-green-600 text-xs px-2 py-1 rounded-full font-bold">${groupSize} Cupos</span>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">1er Año - Nuevo Ingreso</p>
@@ -210,11 +213,11 @@ function generateStudentGroups() {
     });
 }
 
-// Construye grupos para una carrera usando la regla:
-// tamaño de grupo = mínimo de vacantes entre sus asignaturas en ese ciclo.
+// Construye bloques para una carrera usando la regla:
+// tamaño de bloque = mínimo de vacantes entre sus asignaturas en ese ciclo.
 // Permite múltiples bloques de la misma asignatura siempre que no topen en tiempo.
 // Cuando hay varios bloques en la MISMA franja de una asignatura (espejos),
-// todos son equivalentes: el algoritmo elegirá uno distinto por grupo para repartir.
+// todos son equivalentes: el algoritmo elegirá uno distinto por bloque para repartir.
 function buildGroupsForCareer(blocks) {
     if (!blocks || blocks.length === 0) return [];
 
@@ -292,4 +295,122 @@ function buildGroupsForCareer(blocks) {
     }
 
     return groups;
+}
+function getModuleFromTimeRange(rangeStr) {
+    if (!rangeStr) return null;
+    const parts = rangeStr.split('-');
+    if (parts.length < 2) return null;
+    let start = parts[0].trim();
+
+    // Normalizar formato sin dos puntos: "800" -> "08:00"
+    if (!start.includes(':')) {
+        if (start.length === 3) {
+            start = '0' + start[0] + ':' + start.substring(1);
+        } else if (start.length === 4) {
+            start = start.substring(0, 2) + ':' + start.substring(2);
+        }
+    }
+
+    // Mapeo simple por hora de inicio
+    if (start === "08:00") return 1;
+    if (start === "09:30") return 2;
+    if (start === "11:00") return 3;
+    if (start === "12:30") return 4;
+    if (start === "14:00") return 5;
+    if (start === "15:30") return 6;
+    if (start === "17:00") return 7;
+    if (start === "18:30") return 8;
+
+    return null;
+}
+
+// Muestra el horario escolar de un grupo en un modal propio
+function showGroupTimetable(groupIndex) {
+    if (!globalBuiltGroups || !globalBuiltGroups[groupIndex]) return;
+
+    const group = globalBuiltGroups[groupIndex];
+    const blocks = group.blocks || [];
+    const modal = document.getElementById('modal-group-timetable');
+    const titleEl = document.getElementById('group-timetable-title');
+    const subtitleEl = document.getElementById('group-timetable-subtitle');
+    const gridBody = document.getElementById('group-timetable-grid');
+    const careerSelector = document.getElementById('groups-career-selector');
+
+    if (!modal || !gridBody) return;
+
+    const careerName = careerSelector ? careerSelector.value : '';
+    titleEl.textContent = `Horario Bloque ${groupIndex + 1}`;
+    subtitleEl.textContent = careerName ? `Carrera: ${careerName}` : '';
+
+    // Debug: ver qué bloques tenemos
+    console.log('Mostrando horario para bloque', groupIndex, 'con', blocks.length, 'bloques:');
+    blocks.forEach(b => {
+        console.log('  -', b.materia, '|', b.dia_norm, '|', b.horario_texto, '| NRC:', b.nrc);
+    });
+
+    // Definir módulos y días
+    const times = [
+        "08:00 - 09:20", "09:30 - 10:50", "11:00 - 12:20", "12:30 - 13:50",
+        "14:00 - 15:20", "15:30 - 16:50", "17:00 - 18:20", "18:30 - 19:50"
+    ];
+    const days = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]; 
+
+    // Limpiar grilla
+    gridBody.innerHTML = '';
+
+    // Construir filas
+    for (let i = 1; i <= 8; i++) {
+        const tr = document.createElement('tr');
+        tr.className = 'border-b border-slate-200 hover:bg-slate-50 transition';
+
+        const modTd = document.createElement('td');
+        modTd.className = 'p-1 border-r border-slate-200 bg-slate-50 text-center w-20 h-12';
+        modTd.innerHTML = `
+            <span class="block font-bold text-[11px] text-blue-900">Módulo ${i}</span>
+            <span class="text-[9px] text-slate-500 whitespace-nowrap">${times[i-1]}</span>
+        `;
+        tr.appendChild(modTd);
+
+        days.forEach(day => {
+            const td = document.createElement('td');
+            td.className = 'p-1 border-r border-slate-200 align-top h-12 w-28 text-[10px]';
+
+            const blocksHere = blocks.filter(b => {
+                if (b.dia_norm !== day) return false;
+                const mod = getModuleFromTimeRange((b.horario_texto || '').trim());
+                return mod === i;
+            });
+            if (blocksHere.length > 0) {
+                const b = blocksHere[0];
+
+                let colorClass = 'bg-blue-100 border-blue-600 text-blue-900';
+                const tipoUpper = (b.tipo || '').toString().toUpperCase();
+                if (tipoUpper.includes('LAB')) colorClass = 'bg-orange-100 border-orange-600 text-orange-900';
+                if (tipoUpper.includes('TAL')) colorClass = 'bg-green-100 border-green-600 text-green-900';
+                if (tipoUpper.includes('SIM')) colorClass = 'bg-purple-100 border-purple-600 text-purple-900';
+
+                td.innerHTML = `
+                    <div class="${colorClass} border-l-4 p-1.5 rounded text-[10px] shadow-sm h-full overflow-hidden flex items-center justify-center text-center" title="${b.materia}">
+                        <div class="font-bold leading-tight">
+                            NRC ${b.nrc} – ${b.seccion || ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            tr.appendChild(td);
+        });
+
+        gridBody.appendChild(tr);
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeGroupTimetableModal() {
+    const modal = document.getElementById('modal-group-timetable');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
 }
