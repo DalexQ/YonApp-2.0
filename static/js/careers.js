@@ -80,6 +80,7 @@ function renderCareerListTable() {
             <td class="px-6 py-4 text-center"><span class="bg-slate-100 px-2 py-1 rounded text-xs border border-slate-200">${c.semestres} Sem.</span></td>
             <td class="px-6 py-4 text-center text-xs text-slate-500">${c.mallas.join(', ')}</td>
             <td class="px-6 py-4 text-right flex justify-end gap-2">
+                <button onclick="openEditCareerModal('${code}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2 border border-blue-200"><i data-lucide="edit-3" class="w-3 h-3"></i> Editar</button>
                 <button onclick="goToSchedule('${code}')" class="bg-purple-50 text-purple-600 hover:bg-purple-100 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-2 border border-purple-200"><i data-lucide="calendar" class="w-3 h-3"></i> Horarios</button>
                 <button onclick="promptDeleteCareer('${code}')" class="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
             </td>
@@ -96,7 +97,18 @@ function openCareerConfigModal() {
     document.getElementById('cfg-code').disabled = false;
     document.getElementById('cfg-name').value = '';
     document.getElementById('cfg-semesters').value = 10;
-    document.getElementById('cfg-meshes').value = '';
+    renderMeshCheckboxes('cfg-meshes-container', []);
+}
+
+function openEditCareerModal(code) {
+    const career = careerDatabase[code];
+    if (!career) return;
+    
+    document.getElementById('modal-edit-career').classList.remove('hidden');
+    document.getElementById('edit-code').value = code;
+    document.getElementById('edit-name').value = career.nombre;
+    document.getElementById('edit-semesters').value = career.semestres;
+    renderMeshCheckboxes('edit-meshes-container', career.mallas || []);
 }
 
 function toTitleCase(str) {
@@ -110,10 +122,10 @@ async function saveCareerConfig() {
     const nameRaw = document.getElementById('cfg-name').value;
     const name = toTitleCase(nameRaw);
     const sem = document.getElementById('cfg-semesters').value;
-    const meshesRaw = document.getElementById('cfg-meshes').value;
-    const meshes = meshesRaw.split(',').map(m => m.trim()).filter(m => m !== '');
+    const meshes = getSelectedMeshes('cfg-meshes-container');
 
     if(!code || !name) { alert("Faltan datos"); return; }
+    if(meshes.length === 0) { alert("Debe seleccionar al menos una malla"); return; }
 
     try {
         const res = await fetch('/save_career', {
@@ -127,6 +139,32 @@ async function saveCareerConfig() {
             renderCareerListTable();     
             updateScheduleSelectors();   
             document.getElementById('modal-career-config').classList.add('hidden');
+        } else { alert("Error: " + json.error); }
+    } catch(e) { alert("Error de conexión"); }
+}
+
+async function saveEditedCareer() {
+    const code = document.getElementById('edit-code').value.toUpperCase();
+    const nameRaw = document.getElementById('edit-name').value;
+    const name = toTitleCase(nameRaw);
+    const sem = document.getElementById('edit-semesters').value;
+    const meshes = getSelectedMeshes('edit-meshes-container');
+
+    if(!code || !name) { alert("Faltan datos"); return; }
+    if(meshes.length === 0) { alert("Debe seleccionar al menos una malla"); return; }
+
+    try {
+        const res = await fetch('/save_career', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ code, name, semesters: sem, meshes })
+        });
+        const json = await res.json();
+        if(json.success) {
+            careerDatabase = json.data; 
+            renderCareerListTable();     
+            updateScheduleSelectors();   
+            document.getElementById('modal-edit-career').classList.add('hidden');
         } else { alert("Error: " + json.error); }
     } catch(e) { alert("Error de conexión"); }
 }
@@ -702,4 +740,111 @@ async function confirmPlanningBlockDelete() {
 function handleScheduleSelectorChange() {
     updateAddButtonState();
     renderCareerGrid();
+}
+
+// --- FUNCIONES PARA MANEJO DE MALLAS ---
+function renderMeshCheckboxes(containerId, selectedMeshes = []) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Si no hay mallas seleccionadas, mostrar mensaje
+    if (selectedMeshes.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic p-2">No hay mallas configuradas. Use el botón "Agregar nueva malla" para comenzar.</p>';
+        return;
+    }
+    
+    // Ordenar mallas de mayor a menor
+    const sortedMeshes = [...selectedMeshes].sort((a, b) => b - a);
+    
+    sortedMeshes.forEach(mesh => {
+        const checkboxId = `mesh-${containerId}-${mesh}`;
+        
+        const label = document.createElement('label');
+        label.className = 'flex items-center gap-2 cursor-pointer hover:bg-purple-50 p-2 rounded transition';
+        label.innerHTML = `
+            <input type="checkbox" id="${checkboxId}" value="${mesh}" checked 
+                   class="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500">
+            <span class="text-sm text-slate-700">${mesh}</span>
+        `;
+        container.appendChild(label);
+    });
+    
+    // Re-inicializar iconos de Lucide si es necesario
+    if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+    }
+}
+
+function getSelectedMeshes(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return [];
+    
+    const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+    return Array.from(checkboxes).map(cb => cb.value).sort((a, b) => b - a);
+}
+
+let currentMeshContainer = null; // Variable para saber a qué contenedor agregar la malla
+
+function addNewMesh() {
+    currentMeshContainer = 'cfg-meshes-container';
+    document.getElementById('modal-add-mesh').classList.remove('hidden');
+    document.getElementById('new-mesh-year').value = '';
+    document.getElementById('new-mesh-year').focus();
+}
+
+function addNewMeshToEdit() {
+    currentMeshContainer = 'edit-meshes-container';
+    document.getElementById('modal-add-mesh').classList.remove('hidden');
+    document.getElementById('new-mesh-year').value = '';
+    document.getElementById('new-mesh-year').focus();
+}
+
+function closeMeshModal() {
+    document.getElementById('modal-add-mesh').classList.add('hidden');
+    currentMeshContainer = null;
+}
+
+function confirmAddMesh() {
+    const newMesh = document.getElementById('new-mesh-year').value.trim();
+    
+    if (!newMesh || isNaN(newMesh)) {
+        alert("Debe ingresar un año válido");
+        return;
+    }
+    
+    if (!currentMeshContainer) {
+        alert("Error: No se especificó el contenedor");
+        return;
+    }
+    
+    const container = document.getElementById(currentMeshContainer);
+    const existingCheckbox = container.querySelector(`input[value="${newMesh}"]`);
+    
+    if (existingCheckbox) {
+        alert("Esta malla ya existe");
+        existingCheckbox.checked = true;
+        closeMeshModal();
+        return;
+    }
+    
+    // Agregar la nueva malla
+    const checkboxId = `mesh-${currentMeshContainer}-${newMesh}`;
+    const label = document.createElement('label');
+    label.className = 'flex items-center gap-2 cursor-pointer hover:bg-purple-50 p-2 rounded transition';
+    label.innerHTML = `
+        <input type="checkbox" id="${checkboxId}" value="${newMesh}" checked 
+               class="w-4 h-4 text-purple-600 border-slate-300 rounded focus:ring-purple-500">
+        <span class="text-sm text-slate-700">${newMesh}</span>
+    `;
+    
+    // Limpiar mensaje de "No hay mallas" si existe
+    const noMeshesMsg = container.querySelector('p.italic');
+    if (noMeshesMsg) {
+        container.innerHTML = '';
+    }
+    
+    container.prepend(label);
+    closeMeshModal();
 }

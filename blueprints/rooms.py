@@ -233,7 +233,7 @@ def parse_schedule_row(row):
     prof_completo = f"{prof_nombre} {prof_apellido}".strip()
     if prof_completo == "":
         prof_completo = "Por Asignar"
-    
+
     try:
         vacantes = int(row.get("vacantes", 0))
     except Exception:
