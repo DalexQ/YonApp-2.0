@@ -56,12 +56,12 @@
                 <thead class="bg-slate-50 text-slate-600 sticky top-0 z-10 shadow-sm">
                     <tr>
                         <th class="p-2 border-b border-slate-200 w-20 text-center font-semibold text-[10px]">Módulo</th>
-                        <th class="p-2 border-b border-slate-200 w-1/6 text-left font-semibold">Lunes</th>
-                        <th class="p-2 border-b border-slate-200 w-1/6 text-left font-semibold">Martes</th>
-                        <th class="p-2 border-b border-slate-200 w-1/6 text-left font-semibold">Miércoles</th>
-                        <th class="p-2 border-b border-slate-200 w-1/6 text-left font-semibold">Jueves</th>
-                        <th class="p-2 border-b border-slate-200 w-1/6 text-left font-semibold">Viernes</th>
-                        <th class="p-2 border-b border-slate-200 w-1/6 text-left font-semibold">Sábado</th>
+                        <th class="p-2 border-b border-slate-200 w-1/6 text-center font-semibold">Lunes</th>
+                        <th class="p-2 border-b border-slate-200 w-1/6 text-center font-semibold">Martes</th>
+                        <th class="p-2 border-b border-slate-200 w-1/6 text-center font-semibold">Miércoles</th>
+                        <th class="p-2 border-b border-slate-200 w-1/6 text-center font-semibold">Jueves</th>
+                        <th class="p-2 border-b border-slate-200 w-1/6 text-center font-semibold">Viernes</th>
+                        <th class="p-2 border-b border-slate-200 w-1/6 text-center font-semibold">Sábado</th>
                     </tr>
                 </thead>
                 <tbody id="schedule-grid-body">
@@ -87,19 +87,42 @@
                 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NRC</label>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Código Materia</label>
                         <div class="relative">
-                            <input type="text" id="block-nrc" placeholder="Buscar / escribir NRC" 
-                                   class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono"
-                                   oninput="filterNrcOptions()" onfocus="showNrcOptions()" onblur="hideNrcOptionsDelayed()">
-                            <div id="block-nrc-options" class="hidden absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto z-50 text-xs">
-                                <!-- NRC options injected from JS -->
+                            <input type="text" id="block-subject-code" placeholder="Ej: DCEX" 
+                                   class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono uppercase"
+                                   oninput="filterSubjectCodes()" onfocus="showSubjectCodes()" onblur="hideSubjectCodesDelayed()"
+                                   autocomplete="off">
+                            <div id="subject-code-options" class="hidden absolute top-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto z-50">
+                                <!-- Subject code options -->
                             </div>
                         </div>
                     </div>
                     <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nro Curso</label>
+                        <input type="text" id="block-course-number" placeholder="Ej: 0009" maxlength="4"
+                               class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono uppercase"
+                               oninput="this.value = this.value.toUpperCase(); filterNrcBySubject()">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NRC</label>
+                        <div class="relative">
+                            <input type="text" id="block-nrc-input" placeholder="Escribe o selecciona NRC" 
+                                   class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono"
+                                   oninput="handleNrcInput()">
+                            <select id="block-nrc-select" 
+                                    class="hidden w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono bg-white"
+                                    onchange="updateSectionFromNrc()">
+                                <option value="">-- Seleccione NRC --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Sección</label>
-                        <input type="text" id="block-sec" placeholder="P50" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono">
+                        <input type="text" id="block-sec" placeholder="P50" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono uppercase" oninput="this.value = this.value.toUpperCase()">
                     </div>
                 </div>
 
@@ -168,12 +191,23 @@
             <div class="space-y-4">
                 <div class="grid grid-cols-2 gap-4">
                     <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Código Materia</label>
+                        <input type="text" id="edit-subject-code" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none bg-slate-50 font-mono uppercase" disabled>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Nro Curso</label>
+                        <input type="text" id="edit-course-number" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none bg-slate-50 font-mono uppercase" disabled>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">NRC</label>
-                        <input type="text" id="edit-nrc" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono" disabled>
+                        <input type="text" id="edit-nrc" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none bg-slate-50 font-mono" disabled>
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-500 mb-1 uppercase">Sección</label>
-                        <input type="text" id="edit-sec" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-purple-500 font-mono" disabled>
+                        <input type="text" id="edit-sec" class="w-full border border-slate-300 rounded-lg p-2 text-sm outline-none bg-slate-50 font-mono" disabled>
                     </div>
                 </div>
 

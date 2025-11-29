@@ -162,7 +162,9 @@ def add_block():
         "semestre": data.get("semestre"),
         "dia": data.get("dia"),
         "modulo": int(data.get("modulo")),
-        # Eliminamos 'asignatura' (nombre), nos basamos en NRC/Sección
+        # Nuevos campos para identificación completa
+        "codigo_materia": data.get("codigo_materia", ""),
+        "n_curso": data.get("n_curso", ""),
         "nrc": data.get("nrc"),
         "seccion": data.get("seccion"),
         "tipo": data.get("tipo"),
@@ -172,11 +174,12 @@ def add_block():
 
     return jsonify({"success": True, "data": CAREER_DATABASE})
 
+
 @careers_bp.route("/delete_planning_block", methods=["POST"])
 def delete_planning_block():
     data = request.json
     code = data.get("career_code")
-    block_idx = data.get("block_index") # El índice del bloque en la lista (0, 1, 2...)
+    block_idx = data.get("block_index")  # El índice del bloque en la lista (0, 1, 2...)
 
     if code not in CAREER_DATABASE:
         return jsonify({"error": "Carrera no encontrada"}), 404

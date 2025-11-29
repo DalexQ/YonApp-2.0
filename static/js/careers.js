@@ -466,12 +466,49 @@ async function submitNewBlock() {
     const malla = document.getElementById('schedule-malla-selector').value;
     const sem = document.getElementById('schedule-sem-selector').value;
     
-    // Validamos NRC y Sección en vez de nombre
-    const nrc = document.getElementById('block-nrc').value;
-    const sec = document.getElementById('block-sec').value.toUpperCase();
+    // Obtener código de materia y número de curso
+    const subjectCode = document.getElementById('block-subject-code').value.trim().toUpperCase();
+    const courseNumber = document.getElementById('block-course-number').value.trim();
+    
+    // Determinar si se usa input o select para NRC
+    const nrcInput = document.getElementById('block-nrc-input');
+    const nrcSelect = document.getElementById('block-nrc-select');
+    const secInput = document.getElementById('block-sec');
+    
+    let nrc, sec;
+    
+    // Si el select está visible, usarlo
+    if (!nrcSelect.classList.contains('hidden')) {
+        const selectedValue = nrcSelect.value;
+        if(!selectedValue) {
+            alert("Debe seleccionar un NRC");
+            return;
+        }
+        try {
+            const data = JSON.parse(selectedValue);
+            nrc = data.nrc;
+            sec = data.seccion;
+        } catch(e) {
+            alert("Error al procesar el NRC seleccionado");
+            return;
+        }
+    } else {
+        // Si el input está visible, usarlo
+        nrc = nrcInput.value.trim();
+        sec = secInput.value.trim();
+        
+        if(!nrc || !sec) {
+            alert("NRC y Sección son obligatorios");
+            return;
+        }
+    }
+    
+    if(!subjectCode || !courseNumber) {
+        alert("Código de Materia y Nro Curso son obligatorios");
+        return;
+    }
+    
     const type = document.getElementById('block-type').value;
-
-    if(!nrc || !sec) { alert("NRC y Sección son obligatorios"); return; }
 
     // Obtener todos los días y módulos seleccionados
     const dayModuleRows = document.querySelectorAll('.day-module-row');
@@ -500,6 +537,8 @@ async function submitNewBlock() {
                     semestre: sem,
                     dia: block.dia,
                     modulo: block.modulo,
+                    codigo_materia: subjectCode,
+                    n_curso: courseNumber,
                     nrc: nrc,
                     seccion: sec,
                     tipo: type
@@ -517,7 +556,6 @@ async function submitNewBlock() {
         // Si todo fue exitoso
         renderCareerGrid(); 
         closeAddBlockModal();
-        buildNrcOptions();
     } catch(e) { 
         alert("Error de conexión"); 
     }
@@ -525,7 +563,18 @@ async function submitNewBlock() {
 
 function closeAddBlockModal() {
     document.getElementById('modal-add-block').classList.add('hidden');
-    document.getElementById('block-nrc').value = '';
+    document.getElementById('block-subject-code').value = '';
+    document.getElementById('block-course-number').value = '';
+    
+    // Resetear campos de NRC
+    const nrcInput = document.getElementById('block-nrc-input');
+    const nrcSelect = document.getElementById('block-nrc-select');
+    
+    nrcInput.value = '';
+    nrcInput.classList.remove('hidden');
+    nrcSelect.classList.add('hidden');
+    nrcSelect.innerHTML = '<option value="">-- Seleccione NRC --</option>';
+    
     document.getElementById('block-sec').value = '';
     
     // Resetear a una sola fila de día/módulo
@@ -627,8 +676,11 @@ function updateRemoveButtons() {
 let currentEditBlock = null;
 
 function openEditBlockModal(careerCode, malla, semestre, dia, modulo, nrc, seccion) {
-    // Buscar el bloque en la base local para obtener su tipo actual
+    // Buscar el bloque en la base local para obtener todos sus datos
     let tipo = 'TEO';
+    let codigoMateria = '';
+    let nCurso = '';
+    
     const career = careerDatabase[careerCode];
     if (career && Array.isArray(career.planificacion)) {
         const found = career.planificacion.find(b =>
@@ -636,13 +688,22 @@ function openEditBlockModal(careerCode, malla, semestre, dia, modulo, nrc, secci
             b.dia === dia && Number(b.modulo) === Number(modulo) &&
             String(b.nrc) === String(nrc) && b.seccion === seccion
         );
-        if (found && found.tipo) tipo = found.tipo;
+        if (found) {
+            tipo = found.tipo || 'TEO';
+            codigoMateria = found.codigo_materia || '';
+            nCurso = found.n_curso || '';
+        }
     }
 
     currentEditBlock = { careerCode, malla, semestre, dia, modulo, nrc, seccion, tipo };
 
+    // Llenar campos de información (disabled)
+    document.getElementById('edit-subject-code').value = codigoMateria;
+    document.getElementById('edit-course-number').value = nCurso;
     document.getElementById('edit-nrc').value = nrc;
     document.getElementById('edit-sec').value = seccion;
+    
+    // Llenar campos editables
     document.getElementById('edit-day').value = dia;
     document.getElementById('edit-mod').value = modulo;
     
@@ -721,79 +782,181 @@ function deleteBlockFromModal() {
     promptDeleteBlock(matchIndex, code);
 }
 
-// --- AUTOCOMPLETE DE NRC EN MODAL ---
+// --- AUTOCOMPLETE DE NRC EN MODAL (FILTRADO POR MATERIA Y CURSO) ---
 
-function buildNrcOptions() {
-    const code = document.getElementById('schedule-career-selector').value;
-    const malla = document.getElementById('schedule-malla-selector').value;
-    const sem = document.getElementById('schedule-sem-selector').value;
-    const container = document.getElementById('block-nrc-options');
-    if(!container) return;
+// Lista de códigos de materia válidos
+const VALID_SUBJECT_CODES = [
+    'OBMA', 'MEVE', 'TMED', 'ADPU', 'ICOM', 'ARQT', 'FIAD', 'DERE', 'EDUC', 'PEDI', 
+    'ENFE', 'DBIO', 'PSIC', 'QYFA', 'PEEI', 'FORI', 'LCEN', 'CFIN', 'BCSA', 'MEDI', 
+    'DMOR', 'FAEG', 'DQUI', 'DSPU', 'DGEE', 'DCEX', 'CIVU', 'FONA', 'TEOC', 'FAOR', 
+    'DAEC', 'DAED', 'KINE', 'INGE', 'ICIF', 'ICID', 'FACU', 'NYGA', 'ODON', 'DMAE', 
+    'PTAP', 'IGEE', 'ESAP', 'PEMI'
+];
 
+function showSubjectCodes() {
+    const container = document.getElementById('subject-code-options');
+    if (container) {
+        buildSubjectCodeOptions();
+        container.classList.remove('hidden');
+    }
+}
+
+function hideSubjectCodesDelayed() {
+    setTimeout(() => {
+        const container = document.getElementById('subject-code-options');
+        if (container) container.classList.add('hidden');
+    }, 200);
+}
+
+function buildSubjectCodeOptions() {
+    const container = document.getElementById('subject-code-options');
+    if (!container) return;
+    
     container.innerHTML = '';
-
-    if(!code || !careerDatabase[code]) return;
-
-    const allBlocks = careerDatabase[code].planificacion || [];
-    const filteredBlocks = allBlocks.filter(b => {
-        if(malla && b.malla !== malla) return false;
-        if(sem && String(b.semestre) !== String(sem)) return false;
-        return true;
-    });
-
-    const seen = new Set();
-    filteredBlocks.forEach(b => {
-        const key = `${b.nrc}-${b.seccion}`;
-        if(seen.has(key)) return;
-        seen.add(key);
-
+    
+    VALID_SUBJECT_CODES.forEach(code => {
         const div = document.createElement('div');
-        div.className = "px-2 py-1 hover:bg-purple-50 cursor-pointer flex justify-between items-center";
-        div.innerHTML = `
-            <span class="font-mono text-slate-700">${b.nrc}</span>
-            <span class="text-[10px] text-slate-400 ml-2">${b.seccion}</span>
-        `;
+        div.className = "px-3 py-2 hover:bg-purple-50 cursor-pointer text-sm font-mono text-slate-700";
+        div.textContent = code;
         div.onclick = () => {
-            document.getElementById('block-nrc').value = b.nrc;
-            document.getElementById('block-sec').value = b.seccion;
+            document.getElementById('block-subject-code').value = code;
             container.classList.add('hidden');
+            filterNrcBySubject();
         };
         container.appendChild(div);
     });
 }
 
-function showNrcOptions() {
-    const container = document.getElementById('block-nrc-options');
-    if(container) {
-        buildNrcOptions();
-        container.classList.remove('hidden');
+function filterSubjectCodes() {
+    const input = document.getElementById('block-subject-code');
+    const container = document.getElementById('subject-code-options');
+    
+    if (!input || !container) return;
+    
+    const query = input.value.toUpperCase();
+    input.value = query; // Mantener en mayúsculas
+    
+    // Si no hay opciones construidas, construirlas
+    if (!container.children.length) {
+        buildSubjectCodeOptions();
     }
-}
-
-function hideNrcOptionsDelayed() {
-    setTimeout(() => {
-        const container = document.getElementById('block-nrc-options');
-        if(container) container.classList.add('hidden');
-    }, 200);
-}
-
-function filterNrcOptions() {
-    const input = document.getElementById('block-nrc');
-    const container = document.getElementById('block-nrc-options');
-    if(!input || !container) return;
-
-    const query = input.value.toString().toUpperCase();
-
-    // Si todavía no hemos construido la lista, hacerlo ahora
-    if(!container.children.length) buildNrcOptions();
-
+    
+    // Filtrar opciones
+    let visibleCount = 0;
     Array.from(container.children).forEach(child => {
-        const text = child.innerText.toUpperCase();
-        if(text.includes(query)) child.classList.remove('hidden');
-        else child.classList.add('hidden');
+        const text = child.textContent.toUpperCase();
+        if (text.includes(query)) {
+            child.classList.remove('hidden');
+            visibleCount++;
+        } else {
+            child.classList.add('hidden');
+        }
     });
+    
+    // Mostrar u ocultar el contenedor según si hay resultados
+    if (visibleCount > 0 && query.length > 0) {
+        container.classList.remove('hidden');
+    } else {
+        container.classList.add('hidden');
+    }
+    
+    // Actualizar NRC cuando cambia el código de materia
+    filterNrcBySubject();
+}
 
-    container.classList.remove('hidden');
+function filterNrcBySubject() {
+    const subjectCode = document.getElementById('block-subject-code').value.trim().toUpperCase();
+    const courseNumber = document.getElementById('block-course-number').value.trim();
+    const nrcInput = document.getElementById('block-nrc-input');
+    const nrcSelect = document.getElementById('block-nrc-select');
+    
+    if (!nrcInput || !nrcSelect) return;
+    
+    // Si no hay código de materia Y número de curso, mostrar input libre
+    if (!subjectCode || !courseNumber) {
+        nrcInput.classList.remove('hidden');
+        nrcSelect.classList.add('hidden');
+        return;
+    }
+    
+    // Buscar en globalGroupsData (datos del Excel de grupos)
+    if (!window.globalGroupsData || !Array.isArray(window.globalGroupsData)) {
+        // Si no hay datos, dejar input libre
+        nrcInput.classList.remove('hidden');
+        nrcSelect.classList.add('hidden');
+        return;
+    }
+    
+    // Filtrar por codigo_materia y n_curso
+    const filtered = window.globalGroupsData.filter(item => 
+        item.codigo_materia === subjectCode && item.n_curso === courseNumber
+    );
+    
+    if (filtered.length === 0) {
+        // Si no hay coincidencias, dejar input libre
+        nrcInput.classList.remove('hidden');
+        nrcSelect.classList.add('hidden');
+        return;
+    }
+    
+    // Hay coincidencias: mostrar select y ocultar input
+    nrcInput.classList.add('hidden');
+    nrcSelect.classList.remove('hidden');
+    
+    // Limpiar selector
+    nrcSelect.innerHTML = '<option value="">-- Seleccione NRC --</option>';
+    document.getElementById('block-sec').value = '';
+    
+    // Extraer NRC y secciones únicas
+    const nrcMap = new Map();
+    filtered.forEach(item => {
+        const key = `${item.nrc}-${item.seccion}`;
+        if (!nrcMap.has(key)) {
+            nrcMap.set(key, {
+                nrc: item.nrc,
+                seccion: item.seccion,
+                materia: item.materia
+            });
+        }
+    });
+    
+    // Ordenar y agregar opciones
+    const sorted = Array.from(nrcMap.values()).sort((a, b) => {
+        if (a.nrc !== b.nrc) return a.nrc.localeCompare(b.nrc);
+        return a.seccion.localeCompare(b.seccion);
+    });
+    
+    sorted.forEach(item => {
+        const option = document.createElement('option');
+        option.value = JSON.stringify({ nrc: item.nrc, seccion: item.seccion });
+        option.textContent = `${item.nrc} - ${item.seccion}`;
+        nrcSelect.appendChild(option);
+    });
+}
+
+function handleNrcInput() {
+    // Esta función se llama cuando el usuario escribe en el campo NRC libre
+    // No hace nada especial, solo permite escritura libre
+}
+
+function updateSectionFromNrc() {
+    const nrcSelect = document.getElementById('block-nrc-select');
+    const secInput = document.getElementById('block-sec');
+    
+    if (!nrcSelect || !secInput) return;
+    
+    const selectedValue = nrcSelect.value;
+    if (!selectedValue) {
+        secInput.value = '';
+        return;
+    }
+    
+    try {
+        const data = JSON.parse(selectedValue);
+        secInput.value = data.seccion;
+    } catch(e) {
+        console.error('Error parsing NRC data:', e);
+    }
 }
 
 // --- ELIMINACIÓN DE BLOQUES (CARRERAS) ---
