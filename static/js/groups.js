@@ -104,8 +104,14 @@ function populateCareerSelector(scheduleNi) {
 
     if (carrerasSet.size === 0) {
         selector.innerHTML = '<option value="">-- No se encontraron carreras NI --</option>';
+        selector.disabled = true;
+        selector.className = 'p-2 border rounded-lg text-sm font-bold outline-none w-64 bg-slate-100 text-slate-400';
         return;
     }
+
+    // Activar selector y darle un estilo más notorio al tener datos
+    selector.disabled = false;
+    selector.className = 'p-2 border rounded-lg text-sm font-bold outline-none w-64 bg-purple-50 text-purple-700 border-purple-200';
 
     selector.innerHTML = '<option value="">-- Seleccionar Carrera --</option>';
 
@@ -181,7 +187,7 @@ function generateStudentGroups() {
                     <div class="font-bold text-sm leading-tight">${b.materia}</div>
                     <div class="mt-1 flex justify-between opacity-70 text-[10px]">
                         <span>${b.dia_norm.toUpperCase().substring(0,3)} ${b.horario_texto}</span>
-                        <span>Sala: ${b.ubicacion}</span>
+                        <span>Sala: ${b.ubicacion || 'Sin definir'}</span>
                     </div>
                 </div>
             `;
