@@ -305,6 +305,12 @@ function updateScheduleFilters() {
         opt.innerText = `Malla ${m}`;
         mallaSel.appendChild(opt);
     });
+    
+    // Si solo hay una malla activa, seleccionarla automáticamente
+    if (career.mallas.length === 1) {
+        mallaSel.value = career.mallas[0];
+    }
+    
     semSel.innerHTML = '<option value="">-- Seleccionar Semestre --</option>';
     for(let i=1; i<=career.semestres; i++) {
         // Filtrar según periodo: 
