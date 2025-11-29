@@ -2,6 +2,7 @@
 
 let globalGroupsData = null;
 let globalBuiltGroups = [];
+let savedGroupNames = {}; // Almacena nombres por carrera: { "Carrera": ["Nombre1", "Nombre2", ...] }
 
 function onGroupsFileChange(e) {
     const fileInput = e.target;
@@ -164,6 +165,12 @@ function generateStudentGroups() {
         const groupBlocks = group.blocks;
         const groupSize = group.size;
 
+        // Cargar nombre guardado si existe
+        const savedName = savedGroupNames[career] && savedGroupNames[career][idx] 
+            ? savedGroupNames[career][idx] 
+            : `Bloque ${idx + 1}`;
+        group.name = savedName;
+
         const dayOrder = {"lunes":1, "martes":2, "miercoles":3, "jueves":4, "viernes":5, "sabado":6};
         groupBlocks.sort((a, b) => {
             if(dayOrder[a.dia_norm] !== dayOrder[b.dia_norm]) return dayOrder[a.dia_norm] - dayOrder[b.dia_norm];
@@ -199,7 +206,14 @@ function generateStudentGroups() {
         colDiv.innerHTML = `
             <div class="bg-slate-800 text-white p-4 border-b border-slate-700 cursor-pointer hover:bg-slate-900/90" onclick="showGroupTimetable(${idx})">
                 <div class="flex justify-between items-center">
-                    <h3 class="font-bold text-lg">Bloque ${idx + 1}</h3>
+                    <span 
+                        id="group-name-${idx}" 
+                        contenteditable="true" 
+                        class="font-bold text-lg outline-none focus:bg-slate-700 px-2 py-1 rounded cursor-text"
+                        onblur="saveGroupName(${idx}, this.innerText)"
+                        onclick="event.stopPropagation()"
+                        onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+                    >${group.name || `Bloque ${idx + 1}`}</span>
                     <span class="bg-green-600 text-xs px-2 py-1 rounded-full font-bold">${groupSize} Cupos</span>
                 </div>
                 <p class="text-xs text-slate-400 mt-1">1er Año - Nuevo Ingreso</p>
@@ -291,7 +305,7 @@ function buildGroupsForCareer(blocks) {
             if (entry) entry.vac -= groupSize;
         }
 
-        groups.push({ size: groupSize, blocks: groupBlocks });
+        groups.push({ size: groupSize, blocks: groupBlocks, name: `Bloque ${groups.length + 1}` });
     }
 
     return groups;
@@ -339,7 +353,7 @@ function showGroupTimetable(groupIndex) {
     if (!modal || !gridBody) return;
 
     const careerName = careerSelector ? careerSelector.value : '';
-    titleEl.textContent = `Horario Bloque ${groupIndex + 1}`;
+    titleEl.textContent = `Horario ${group.name || `Bloque ${groupIndex + 1}`}`;
     subtitleEl.textContent = careerName ? `Carrera: ${careerName}` : '';
 
     // Debug: ver qué bloques tenemos
@@ -413,4 +427,30 @@ function closeGroupTimetableModal() {
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+}
+
+function saveGroupName(groupIndex, newName) {
+    if (!globalBuiltGroups || !globalBuiltGroups[groupIndex]) return;
+    
+    const careerSelector = document.getElementById('groups-career-selector');
+    const career = careerSelector ? careerSelector.value : '';
+    if (!career) return;
+    
+    const trimmedName = newName.trim();
+    const finalName = trimmedName || `Bloque ${groupIndex + 1}`;
+    
+    // Guardar en el grupo actual
+    globalBuiltGroups[groupIndex].name = finalName;
+    
+    // Persistir en el almacenamiento por carrera
+    if (!savedGroupNames[career]) {
+        savedGroupNames[career] = [];
+    }
+    savedGroupNames[career][groupIndex] = finalName;
+    
+    // Si el nombre está vacío, restaurar visualmente
+    if (!trimmedName) {
+        const nameEl = document.getElementById(`group-name-${groupIndex}`);
+        if (nameEl) nameEl.innerText = finalName;
+    }
 }
