@@ -2,6 +2,7 @@ import os
 from flask import Flask, render_template
 from blueprints.rooms import rooms_bp
 from blueprints.careers import careers_bp
+from blueprints.groups import groups_bp
 
 app = Flask(__name__)
 
@@ -13,6 +14,7 @@ app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 # Registrar Módulos
 app.register_blueprint(rooms_bp)
 app.register_blueprint(careers_bp)
+app.register_blueprint(groups_bp, url_prefix="/groups")
 
 
 @app.route("/")

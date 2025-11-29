@@ -1,3 +1,4 @@
+# blueprints/rooms.py
 import os
 from flask import Blueprint, request, jsonify, current_app
 import pandas as pd
@@ -73,7 +74,7 @@ ROOM_DATABASE = {
     "P207": {"cap": 60, "cat": "Sala"},
     "A305": {"cap": 54, "cat": "Sala"},
     "I201": {"cap": 30, "cat": "Laboratorio"},
-    "A308": {"cap": 30, "cat": "Laboratorio"},
+    "A308": {"cap": 30, "cat": "Lab. Comp"},
     "B104": {"cap": 46, "cat": "Sala"},
     "P302": {"cap": 84, "cat": "Sala"},
     "VA100": {"cap": 1000, "cat": "Sala Virtual"},
@@ -133,7 +134,7 @@ def normalize_columns(df):
         "nombre": "nombre_asignatura",
         "materia": "codigo_materia",
         "sala": "ubicacion",
-        "carrera_reserva": "grupo",
+        "carrera_reserva": "carrera",
         "hr_inicio": "inicio",
         "hr_fin": "fin",
         "nrc": "nrc",
@@ -145,6 +146,7 @@ def normalize_columns(df):
         "fecha_term": "fecha_term",
         "nombre_": "prof_nombre",
         "apellido": "prof_apellido",
+        "vacantes": "vacantes",
     }
     df.rename(columns=column_mapping, inplace=True)
     return df
@@ -213,7 +215,8 @@ def parse_schedule_row(row):
 
     nombre_asignatura = str(row.get("nombre_asignatura", "Sin Nombre")).strip()
     ubicacion = str(row.get("ubicacion", "Sin Sala")).strip()
-    grupo = str(row.get("grupo", "General")).strip()
+    carrera = str(row.get("carrera", "")).strip()
+
     nrc = str(row.get("nrc", "")).strip().replace(".0", "")
     if nrc.lower() == "nan" or nrc == "":
         nrc = "?"
@@ -230,6 +233,11 @@ def parse_schedule_row(row):
     prof_completo = f"{prof_nombre} {prof_apellido}".strip()
     if prof_completo == "":
         prof_completo = "Por Asignar"
+    
+    try:
+        vacantes = int(row.get("vacantes", 0))
+    except Exception:
+        vacantes = 0
 
     for day in days:
         if day in row.index:
@@ -241,7 +249,7 @@ def parse_schedule_row(row):
                             "materia": nombre_asignatura,
                             "codigo_materia": codigo_materia,
                             "ubicacion": ubicacion,
-                            "grupo": grupo,
+                            "carrera": carrera,
                             "nrc": nrc,
                             "seccion": seccion,
                             "n_curso": n_curso,
@@ -250,8 +258,11 @@ def parse_schedule_row(row):
                             "fecha_term": fecha_term,
                             "profesor": prof_completo,
                             "tiempo": f"{inicio} - {fin}",
+                            "horario_texto": f"{inicio} - {fin}",
+                            "tipo": componente,
                             "modulo": mod_num,
                             "dia_norm": day,
+                            "vacantes": vacantes,
                         }
                     )
     return entries
@@ -269,7 +280,6 @@ def process_schedule(file_path):
 
         expanded_schedule = []
         room_usage_counter = {room: 0 for room in ROOM_DATABASE.keys()}
-
         for _, row in df.iterrows():
             class_instances = parse_schedule_row(row)
             sala_excel = str(row["ubicacion"]).strip()
@@ -315,6 +325,7 @@ def process_schedule(file_path):
             )
 
         room_stats.sort(key=lambda x: x["sala"])
+
         return {
             "stats": room_stats,
             "schedule": expanded_schedule,
@@ -411,7 +422,7 @@ def assign_subject():
         "materia": data.get("materia", "Asignatura Manual"),
         "codigo_materia": data.get("codigo", ""),
         "ubicacion": data["sala"],
-        "grupo": "",
+        "carrera": "",
         "nrc": data["nrc"],
         "seccion": data["seccion"],
         "n_curso": "",

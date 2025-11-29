@@ -190,7 +190,7 @@ function applyFiltersAndSort() {
 }
 
 function updateOccupancyTable(stats) {
-    const tbody = document.getElementById('occupancy-table-body');
+    const tbody = document.getElementById('occupancy-table-body');  
     if(!tbody) return;
     tbody.innerHTML = '';
 

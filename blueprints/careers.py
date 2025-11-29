@@ -16,6 +16,12 @@ CAREER_DATABASE = {
         "mallas": ["2020"],
         "planificacion": [],
     },
+    "ADPU": {
+        "nombre": "Administración Pública",
+        "semestres": 10,
+        "mallas": ["2021"],
+        "planificacion": [],
+    }
 }
 
 # 1 = Primer Semestre (Impares), 2 = Segundo Semestre (Pares)

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<section id="tab-career-groups" class="view-section hidden space-y-6 h-full flex flex-col">
+    <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+        <div>
+            <h2 class="text-xl font-bold text-slate-800">Grupos de Horario (1° Año)</h2>
+            <p class="text-sm text-slate-500">Generación automática basada en NRCs de Nuevo Ingreso (NI).</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- Subida independiente de Excel para Grupos 1° Año, estilo dropzone como Salas -->
+            <form id="groups-upload-form" class="flex items-center gap-2" onsubmit="event.preventDefault(); initGroupsView();">
+                <div class="relative bg-white border-2 border-dashed border-slate-300 hover:border-purple-500 transition rounded-xl px-4 py-3 cursor-pointer text-xs text-slate-600 flex items-center gap-2">
+                    <input type="file" name="file" accept=".xlsx,.xls" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="onGroupsFileChange(event)" />
+                    <div class="bg-purple-50 w-8 h-8 rounded-full flex items-center justify-center">
+                        <i data-lucide="upload-cloud" class="w-4 h-4 text-purple-600"></i>
+                    </div>
+                    <div class="flex flex-col text-left">
+                        <span class="font-semibold text-purple-700">Excel Reporte</span>
+                        <span id="groups-file-name" class="text-[10px] text-slate-400">Arrastra y suelta o haz clic</span>
+                    </div>
+                </div>
+                <button id="groups-upload-submit" type="submit" class="px-3 py-1.5 bg-purple-200 text-purple-700 text-xs rounded-lg hover:bg-purple-700 hover:text-white transition-colors" disabled>Cargar</button>
+            </form>
+            <!-- Selector de Carrera -->
+            <select id="groups-career-selector" onchange="generateStudentGroups()" class="p-2 border border-slate-200 rounded-lg text-sm font-bold text-purple-700 outline-none bg-purple-50 border-purple-200 w-64">
+                <option value="">-- Cargar Excel Reporte --</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Contenedor de Grupos -->
+    <div class="flex-1 overflow-x-auto pb-4">
+        <div id="groups-container" class="flex gap-6 h-full min-w-max px-1">
+            <!-- JS inyecta columnas aquí -->
+        </div>
+        
+        <div id="groups-empty-state" class="flex flex-col items-center justify-center h-full text-slate-400">
+            <div class="bg-slate-100 p-4 rounded-full mb-3">
+                <i data-lucide="users" class="w-10 h-10 opacity-50"></i>
+            </div>
+            <p>Selecciona una carrera arriba para ver sus grupos.</p>
+        </div>
+    </div>
+</section>

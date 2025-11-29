@@ -85,7 +85,7 @@ function switchTab(tabId) {
     if (titleEl) titleEl.innerText = titles[tabId] || 'YonApp';
 
     // Hook para el gráfico de salas (si estamos en esa pestaña y existe la data)
-    if(tabId === 'occupancy' && typeof renderOccupancyChart === 'function' && typeof globalData !== 'undefined' && globalData) {
+    if(tabId === 'occupancy' && typeof renderOccupancyChart === 'function' && typeof globalData !== 'Sin Definir' && globalData) {
         setTimeout(renderOccupancyChart, 50);
     }
 
@@ -93,6 +93,10 @@ function switchTab(tabId) {
     if(tabId === 'subject-list' && typeof loadSubjectsFromDatabase === 'function') {
         loadSubjectsFromDatabase();
     }
+
+    // La carga de Excel para Grupos 1° Año se hace sólo
+    // cuando se presiona el botón "Cargar" del formulario,
+    // así evitamos mostrar el modal de carga al entrar a la vista.
     
     lucide.createIcons();
 }
