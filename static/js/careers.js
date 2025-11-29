@@ -363,9 +363,9 @@ function renderCareerGrid() {
         tr.className = "border-b border-slate-100"; 
 
         tr.innerHTML = `
-            <td class="p-2 border-r border-slate-100 bg-slate-50 text-center align-middle h-24">
-                <span class="block font-bold text-slate-700">M${i+1}</span>
-                <span class="text-[10px] text-slate-400 whitespace-nowrap">${times[i]}</span>
+            <td class="p-1.5 border-r border-slate-100 bg-slate-50 text-center align-middle h-16">
+                <span class="block font-bold text-slate-700 text-xs">M${i+1}</span>
+                <span class="text-[9px] text-slate-400 whitespace-nowrap">${times[i]}</span>
             </td>
         `;
 
@@ -385,21 +385,21 @@ function renderCareerGrid() {
                     const dayLiteral = JSON.stringify(day);
 
                     return `
-                        <div class="flex-1 ${bgClass} border border-l-4 p-1 text-xs flex flex-col justify-center items-center overflow-hidden hover:brightness-95 transition cursor-pointer text-center group relative"
+                        <div class="flex-1 ${bgClass} border border-l-4 p-1 text-[10px] flex flex-col justify-center items-center overflow-hidden hover:brightness-95 transition cursor-pointer text-center group relative"
                              onclick='openEditBlockModal(${codeLiteral}, ${mallaLiteral}, ${semLiteral}, ${dayLiteral}, ${i+1}, ${nrcLiteral}, ${secLiteral})'>
-                            <button type="button" onclick='promptDeleteBlock(${block.originalIndex}, ${codeLiteral}); event.stopPropagation();' class="absolute top-1 right-1 hidden group-hover:flex items-center justify-center bg-white/80 text-red-600 rounded-full p-1 shadow-sm hover:bg-white">
-                                <i data-lucide="trash-2" class="w-3 h-3"></i>
+                            <button type="button" onclick='promptDeleteBlock(${block.originalIndex}, ${codeLiteral}); event.stopPropagation();' class="absolute top-0.5 right-0.5 hidden group-hover:flex items-center justify-center bg-white/80 text-red-600 rounded-full p-0.5 shadow-sm hover:bg-white">
+                                <i data-lucide="trash-2" class="w-2.5 h-2.5"></i>
                             </button>
-                            <div class="font-bold truncate w-full">NRC ${block.nrc}</div>
-                            <div class="text-[10px] opacity-80">${block.seccion}</div>
+                            <div class="font-bold truncate w-full text-[10px]">NRC ${block.nrc}</div>
+                            <div class="text-[9px] opacity-80">${block.seccion}</div>
                         </div>
                     `;
                 }).join('');
 
-                content = `<div class="flex h-full w-full gap-1 p-1">${blocksHTML}</div>`;
+                content = `<div class="flex h-full w-full gap-1 p-0.5">${blocksHTML}</div>`;
             }
 
-            tr.innerHTML += `<td class="h-24 p-0 border-r border-slate-100 align-top relative hover:bg-slate-50 transition">${content}</td>`;
+            tr.innerHTML += `<td class="h-16 p-0 border-r border-slate-100 align-top relative hover:bg-slate-50 transition">${content}</td>`;
         });
         tbody.appendChild(tr);
     }
