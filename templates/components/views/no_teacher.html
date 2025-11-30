@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<section id="tab-no-teacher" class="view-section hidden space-y-6">
+    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                <i data-lucide="user-x" class="w-6 h-6"></i>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-slate-800">Asignaturas Sin Docente</h2>
+                <p class="text-sm text-slate-500">Salas que no tienen docente asignado</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center justify-between mb-4">
+            <div class="text-sm text-slate-600">
+                Total sin docente: <span id="no-teacher-count" class="font-bold text-red-600">0</span>
+            </div>
+            <button onclick="loadRoomsWithoutTeacher()" class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-lg shadow-sm transition flex items-center gap-2">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i> Actualizar
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-800 text-white">
+                    <tr>
+                        <th class="p-3 text-left font-semibold">NRC</th>
+                        <th class="p-3 text-left font-semibold">Sección</th>
+                        <th class="p-3 text-left font-semibold">Código</th>
+                        <th class="p-3 text-left font-semibold">N° Curso</th>
+                        <th class="p-3 text-left font-semibold">Asignatura</th>
+                        <th class="p-3 text-left font-semibold">Tipo</th>
+                        <th class="p-3 text-left font-semibold">Carrera</th>
+                        <th class="p-3 text-left font-semibold">Sala</th>
+                        <th class="p-3 text-left font-semibold">Horario</th>
+                        <th class="p-3 text-left font-semibold">Días</th>
+                    </tr>
+                </thead>
+                <tbody id="no-teacher-list" class="divide-y divide-slate-200">
+                    <tr>
+                        <td colspan="10" class="p-8 text-center text-slate-500">
+                            <i data-lucide="loader" class="w-8 h-8 mx-auto mb-2 animate-spin"></i>
+                            Cargando datos...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

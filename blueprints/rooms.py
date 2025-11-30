@@ -347,6 +347,12 @@ def upload_file():
         # FIX: Usar current_app para obtener la config de la app principal
         filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], file.filename)
         file.save(filepath)
+
+        # Also save a copy as "latest.xlsx" for report queries
+        latest_path = os.path.join(current_app.config["UPLOAD_FOLDER"], "latest.xlsx")
+        file.seek(0)  # Reset file pointer
+        file.save(latest_path)
+
         data, error = process_schedule(filepath)
         if error:
             return jsonify({"error": error}), 500
@@ -473,3 +479,145 @@ def delete_assignment():
     )
 
     return jsonify({"success": True})
+
+
+@rooms_bp.route("/unassigned_nrcs", methods=["GET"])
+def get_unassigned_nrcs():
+    """Retorna los NRCs del Excel que no tienen sala asignada (ubicacion vacía o inválida)"""
+    try:
+        # Need to reload the Excel to get all NRCs including unassigned ones
+        filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], "latest.xlsx")
+        if not os.path.exists(filepath):
+            # Try to find any excel file
+            upload_folder = current_app.config["UPLOAD_FOLDER"]
+            files = [f for f in os.listdir(upload_folder) if f.endswith(('.xlsx', '.xls'))]
+            if not files:
+                return jsonify({"success": False, "error": "No hay archivo Excel cargado"}), 404
+            filepath = os.path.join(upload_folder, files[0])
+        
+        df = pd.read_excel(filepath)
+        df = normalize_columns(df)
+        
+        # Filter rows without valid ubicacion
+        unassigned = df[
+            (df['ubicacion'].isna()) |
+            (df['ubicacion'].astype(str).str.strip() == '') |
+            (df['ubicacion'].astype(str).str.strip().str.lower() == 'nan')
+        ]
+        
+        # Extract relevant info
+        result = []
+        for _, row in unassigned.iterrows():
+            nrc = str(row.get("nrc", "")).strip().replace(".0", "")
+            if nrc.lower() == "nan" or nrc == "":
+                continue
+                
+            seccion = str(row.get("seccion", "")).strip()
+            nombre_asignatura = str(row.get("nombre_asignatura", "Sin Nombre")).strip()
+            codigo_materia = str(row.get("codigo_materia", "")).strip()
+            n_curso = str(row.get("n_curso", "")).strip()
+            componente = str(row.get("componente", "")).strip()
+            carrera = str(row.get("carrera", "")).strip()
+            
+            result.append({
+                "nrc": nrc,
+                "seccion": seccion,
+                "materia": nombre_asignatura,
+                "codigo_materia": codigo_materia,
+                "n_curso": n_curso,
+                "componente": componente,
+                "carrera": carrera
+            })
+        
+        return jsonify({"success": True, "data": result})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@rooms_bp.route("/rooms_without_teacher", methods=["GET"])
+def get_rooms_without_teacher():
+    """Retorna las asignaturas que tienen 'SIN DOCENTE' en la columna prof_nombre"""
+    try:
+        filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], "latest.xlsx")
+        if not os.path.exists(filepath):
+            upload_folder = current_app.config["UPLOAD_FOLDER"]
+            files = [f for f in os.listdir(upload_folder) if f.endswith(('.xlsx', '.xls'))]
+            if not files:
+                return jsonify({"success": False, "error": "No hay archivo Excel cargado"}), 404
+            filepath = os.path.join(upload_folder, files[0])
+        
+        df = pd.read_excel(filepath)
+        df = normalize_columns(df)
+        
+        # Filter rows where prof_nombre contains "SIN DOCENTE"
+        no_teacher = df[
+            df['prof_nombre'].astype(str).str.strip().str.upper() == 'SIN DOCENTE'
+        ]
+
+        # Group by all fields except carrera to eliminate duplicates
+        grouped_data = {}
+
+        for _, row in no_teacher.iterrows():
+            nrc = str(row.get("nrc", "")).strip().replace(".0", "")
+            if nrc.lower() == "nan" or nrc == "":
+                nrc = "?"
+
+            seccion = str(row.get("seccion", "")).strip()
+            nombre_asignatura = str(row.get("nombre_asignatura", "Sin Nombre")).strip()
+            codigo_materia = str(row.get("codigo_materia", "")).strip()
+            n_curso = str(row.get("n_curso", "")).strip()
+            componente = str(row.get("componente", "")).strip()
+            carrera = str(row.get("carrera", "")).strip()
+            ubicacion = str(row.get("ubicacion", "Sin Sala")).strip()
+
+            # Parse schedule info
+            inicio = str(row.get("inicio", "")).strip().replace(".0", "")
+            fin = str(row.get("fin", "")).strip().replace(".0", "")
+
+            # Get days
+            days = []
+            for day in ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]:
+                if day in row.index:
+                    val = str(row[day]).strip().lower()
+                    if val not in ("nan", "", "none"):
+                        days.append(day.capitalize())
+
+            dias_str = ", ".join(days)
+            horario = f"{inicio} - {fin}"
+
+            # Create unique key for grouping (all fields except carrera)
+            key = (nrc, seccion, codigo_materia, n_curso, nombre_asignatura,
+                   componente, ubicacion, horario, dias_str)
+
+            if key not in grouped_data:
+                grouped_data[key] = {
+                    "nrc": nrc,
+                    "seccion": seccion,
+                    "materia": nombre_asignatura,
+                    "codigo_materia": codigo_materia,
+                    "n_curso": n_curso,
+                    "componente": componente,
+                    "carreras": set(),  # Use set to avoid duplicates
+                    "ubicacion": ubicacion,
+                    "horario": horario,
+                    "dias": dias_str
+                }
+
+            # Add carrera to the set (skip empty or nan values)
+            if carrera and carrera.lower() not in ("nan", "", "none"):
+                grouped_data[key]["carreras"].add(carrera)
+
+        # Convert sets to sorted comma-separated strings
+        result = []
+        for item in grouped_data.values():
+            carreras_list = sorted(list(item["carreras"]))
+            item["carrera"] = ", ".join(carreras_list) if carreras_list else "-"
+            del item["carreras"]  # Remove the set field
+            result.append(item)
+
+        # Sort by NRC and section for consistent ordering
+        result.sort(key=lambda x: (x["nrc"], x["seccion"]))
+
+        return jsonify({"success": True, "data": result})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

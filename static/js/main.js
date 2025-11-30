@@ -77,6 +77,8 @@ function switchTab(tabId) {
         'timetable': 'Visualizador de Horarios',
         'occupancy': 'Monitor de Ocupación',
         'finder': 'Buscador de Salas',
+        'unassigned-nrcs': 'NRCs Sin Sala Asignada',
+        'no-teacher': 'Asignaturas Sin Docente',
         'career-schedule': 'Planificador Académico',
         'career-list': 'Carreras',
         'subject-list': 'Asignaturas'
@@ -92,6 +94,16 @@ function switchTab(tabId) {
     // Hook para cargar asignaturas
     if(tabId === 'subject-list' && typeof loadSubjectsFromDatabase === 'function') {
         loadSubjectsFromDatabase();
+    }
+
+    // Hook para cargar NRCs sin sala
+    if(tabId === 'unassigned-nrcs' && typeof loadUnassignedNRCs === 'function') {
+        loadUnassignedNRCs();
+    }
+
+    // Hook para cargar salas sin docente
+    if(tabId === 'no-teacher' && typeof loadRoomsWithoutTeacher === 'function') {
+        loadRoomsWithoutTeacher();
     }
 
     // La carga de Excel para Grupos 1° Año se hace sólo
