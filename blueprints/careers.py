@@ -21,7 +21,115 @@ CAREER_DATABASE = {
         "semestres": 10,
         "mallas": ["2021"],
         "planificacion": [],
-    }
+    },
+    "ARQT": {
+        "nombre": "Arquitectura",
+        "semestres": 10,
+        "mallas": ["2018"],
+        "planificacion": [],
+    },
+    "BCSA": {
+        "nombre": "Bachillerato en Ciencias de la Salud",
+        "semestres": 6,
+        "mallas": ["2022"],
+        "planificacion": [],
+    },
+    "ICOM": {
+        "nombre": "Ingeniería Comercial",
+        "semestres": 10,
+        "mallas": ["2019"],
+        "planificacion": [],
+    },
+    "AECO": {
+        "nombre": "Administración en Expedición y Ecoturismo",
+        "semestres": 10,
+        "mallas": ["2023"],
+        "planificacion": [],
+    },
+    "DERE": {
+        "nombre": "Derecho",
+        "semestres": 10,
+        "mallas": ["2020"],
+        "planificacion": [],
+    },
+    "FONO": {
+        "nombre": "Fonoaudiología",
+        "semestres": 10,
+        "mallas": ["2021"],
+        "planificacion": [],
+    },
+    "ICID": {
+        "nombre": "Ingeniería Civil Industrial",
+        "semestres": 10,
+        "mallas": ["2018"],
+        "planificacion": [],
+    },
+    "ICIF": {
+        "nombre": "Ingeniería Civil Informática",
+        "semestres": 10,
+        "mallas": ["2019", "2024"],
+        "planificacion": [],
+    },
+    "MEVE": {
+        "nombre": "Medicina Veterinaria",
+        "semestres": 10,
+        "mallas": ["2022"],
+        "planificacion": [],
+    },
+    "NYGA": {
+        "nombre": "Nutrición y Gastronomía",
+        "semestres": 10,
+        "mallas": ["2020"],
+        "planificacion": [],
+    },
+    "ODON": {
+        "nombre": "Odontología",
+        "semestres": 10,
+        "mallas": ["2021"],
+        "planificacion": [],
+    },
+    "OBMA": {
+        "nombre": "Obstetricia",
+        "semestres": 10,
+        "mallas": ["2019"],
+        "planificacion": [],
+    },
+    "PEDI": {
+        "nombre": "Pedagogía en Educación Diferencial",
+        "semestres": 10,
+        "mallas": ["2023"],
+        "planificacion": [],
+    },
+    "PEEI": {
+        "nombre": "Pedagogía en Educación en Inglés",
+        "semestres": 10,
+        "mallas": ["2022"],
+        "planificacion": [],
+    },
+    "PSICO": {
+        "nombre": "Psicología",
+        "semestres": 10,
+        "mallas": ["2021"],
+        "planificacion": [],
+    },
+    "QYFA": {
+        "nombre": "Química y Farmacia",
+        "semestres": 10,
+        "mallas": ["2020"],
+        "planificacion": [],
+    },
+    "TEOC": {
+        "nombre": "Terapia Ocupacional",
+        "semestres": 10,
+        "mallas": ["2018"],
+        "planificacion": [],
+    },
+    "TMED": {
+        "nombre": "Tecnología Médica",
+        "semestres": 10,
+        "mallas": ["2019"],
+        "planificacion": [],
+    },
 }
 
 # 1 = Primer Semestre (Impares), 2 = Segundo Semestre (Pares)
@@ -53,7 +161,7 @@ def save_career():
     name = data.get("name", "").strip()
     try:
         semesters = int(data.get("semesters", 10))
-    except:
+    except (ValueError, TypeError):
         semesters = 10
     meshes = data.get("meshes", [])
 

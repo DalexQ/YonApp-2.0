@@ -215,6 +215,8 @@ function updateOccupancyTable(stats) {
     lucide.createIcons();
 }
 
+let currentFinderResults = []; // Variable global para guardar los resultados actuales
+
 function searchRooms() {
     if (!globalData) {
         showStatusModal('error', 'Sin Datos', 'Primero debes subir un archivo Excel.');
@@ -231,20 +233,48 @@ function searchRooms() {
         return daysToCheck.some(day => !globalData.schedule.find(c => c.ubicacion === room.sala && c.dia_norm === day && c.modulo === mod));
     });
 
+    // Guardar resultados y resetear ordenamiento
+    currentFinderResults = availableRooms.map(room => ({
+        ...room,
+        dayToHighlight: selectedDay === 'any' ? allDays.find(day => !globalData.schedule.find(c => c.ubicacion === room.sala && c.dia_norm === day && c.modulo === mod)) : selectedDay
+    }));
+    
+    document.getElementById('finder-sort').value = 'none';
+    renderFinderResults();
+}
+
+function applySortToFinderResults() {
+    const sortOrder = document.getElementById('finder-sort').value;
+    
+    if (sortOrder === 'asc') {
+        // Menor a Mayor
+        currentFinderResults.sort((a, b) => a.capacidad_max - b.capacidad_max);
+    } else if (sortOrder === 'desc') {
+        // Mayor a Menor
+        currentFinderResults.sort((a, b) => b.capacidad_max - a.capacidad_max);
+    }
+    // Si es 'none', mantener el orden original (no hacer nada)
+    
+    renderFinderResults();
+}
+
+function renderFinderResults() {
     const container = document.getElementById('finder-results');
     const tbody = document.getElementById('finder-table-body');
     const countLabel = document.getElementById('finder-count');
+    const selectedDay = document.getElementById('find-day').value;
+    
     tbody.innerHTML = '';
     container.classList.remove('hidden');
-    countLabel.innerText = `${availableRooms.length} encontrados`;
+    countLabel.innerText = `${currentFinderResults.length} encontrados`;
 
-    if (availableRooms.length === 0) {
+    if (currentFinderResults.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-8 text-center text-slate-500">No hay salas disponibles.</td></tr>`;
         return;
     }
 
-    availableRooms.forEach(room => {
-        let dayToHighlight = selectedDay === 'any' ? allDays.find(day => !globalData.schedule.find(c => c.ubicacion === room.sala && c.dia_norm === day && c.modulo === mod)) : selectedDay;
+    currentFinderResults.forEach(room => {
+        const mod = parseInt(document.getElementById('find-mod').value);
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50 transition";
         tr.innerHTML = `
@@ -252,8 +282,8 @@ function searchRooms() {
             <td class="px-6 py-3 text-xs">${room.categoria}</td>
             <td class="px-6 py-3 text-slate-500">${room.capacidad_max}</td>
             <td class="px-6 py-3 text-right">
-                <button onclick="viewRoomSchedule('${room.sala}', '${dayToHighlight}', ${mod})" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded shadow-sm transition flex items-center gap-1 ml-auto">
-                    Ver Disponibilidad ${selectedDay === 'any' ? `<span class="opacity-75 text-[10px]">(${dayToHighlight})</span>` : ''}
+                <button onclick="viewRoomSchedule('${room.sala}', '${room.dayToHighlight}', ${mod})" class="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded shadow-sm transition flex items-center gap-1 ml-auto">
+                    Ver Disponibilidad ${selectedDay === 'any' ? `<span class="opacity-75 text-[10px]">(${room.dayToHighlight})</span>` : ''}
                 </button>
             </td>
         `;

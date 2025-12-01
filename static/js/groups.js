@@ -189,14 +189,16 @@ function generateStudentGroups() {
             if (tipoUpper.includes("SIM")) colorClass = "border-purple-500 bg-purple-50 text-purple-800";
 
             blocksHtml += `
-                <div class="mb-2 p-2 border-l-4 ${colorClass} rounded text-xs relative group">
-                    <div class="flex justify-between font-bold mb-1">
-                        <span>NRC: ${b.nrc} &nbsp; Sección: ${b.seccion || ''}</span>
-                        <span class="bg-white/50 px-1 rounded">${b.tipo}</span>
+                <div class="mb-2 p-3 border-l-4 ${colorClass} rounded relative group">
+                    <div class="flex justify-between items-start mb-2">
+                        <div class="font-bold text-lg leading-tight">
+                            NRC ${b.nrc} - ${b.seccion || 'S/N'}
+                        </div>
+                        <span class="bg-white/60 px-2 py-0.5 rounded text-xs font-semibold">${b.tipo}</span>
                     </div>
-                    <div class="font-bold text-sm leading-tight">${b.materia}</div>
-                    <div class="mt-1 flex justify-between opacity-70 text-[10px]">
-                        <span>${b.dia_norm.toUpperCase().substring(0,3)} ${b.horario_texto}</span>
+                    <div class="text-xs opacity-80 mb-2 leading-snug">${b.materia}</div>
+                    <div class="flex justify-between opacity-70 text-[10px]">
+                        <span class="font-medium">${b.dia_norm.toUpperCase().substring(0,3)} ${b.horario_texto}</span>
                         <span>Sala: ${b.ubicacion || 'Sin definir'}</span>
                     </div>
                 </div>
@@ -227,89 +229,140 @@ function generateStudentGroups() {
     });
 }
 
-// Construye bloques para una carrera usando la regla:
-// tamaño de bloque = mínimo de vacantes entre sus asignaturas en ese ciclo.
-// Permite múltiples bloques de la misma asignatura siempre que no topen en tiempo.
-// Cuando hay varios bloques en la MISMA franja de una asignatura (espejos),
-// todos son equivalentes: el algoritmo elegirá uno distinto por bloque para repartir.
+// Construye bloques para una carrera considerando:
+// 1. Cada estudiante toma TODAS las materias disponibles
+// 2. De cada materia, toma TODAS las secciones (una por tipo: TEO, LAB, TAL, SIM)
+// 3. Tamaño del bloque = mínimo de vacantes entre todas las secciones
+// 4. Cuando una sección se agota, se usa la siguiente disponible de ese materia-tipo
 function buildGroupsForCareer(blocks) {
     if (!blocks || blocks.length === 0) return [];
 
-    // Copia mutable de vacantes por bloque (NRC/sección)
-    const remaining = blocks.map(b => ({ ref: b, vac: b.vacantes || 0 }));
+    console.log('=== Iniciando construcción de bloques ===');
+    console.log('Total de bloques disponibles:', blocks.length);
 
-    // Índice rápido por (materia, dia, horario) -> lista de entradas remaining
-    function getRemainingBySubjectAndSlot(materia, dia, horario) {
-        return remaining.filter(r =>
-            r.vac > 0 &&
-            r.ref.materia === materia &&
-            r.ref.dia_norm === dia &&
-            r.ref.horario_texto === horario
-        );
-    }
+    // Copia mutable de todas las secciones con sus vacantes
+    const allSections = blocks.map(b => ({
+        ref: b,
+        vac: b.vacantes || 0,
+        nrc: b.nrc,
+        seccion: b.seccion,
+        materia: b.materia,
+        tipo: (b.tipo || b.componente || '').toString().toUpperCase().trim(),
+        dia_norm: b.dia_norm,
+        horario_texto: b.horario_texto
+    }));
 
-    // Grupo de "plantilla": lista de todas las combinaciones únicas materia/dia/horario
-    const templateSlots = [];
-    const seenTemplateKeys = new Set();
-    blocks.forEach(b => {
-        const key = `${b.materia}__${b.dia_norm}__${b.horario_texto}`;
-        if (!seenTemplateKeys.has(key)) {
-            seenTemplateKeys.add(key);
-            templateSlots.push({
-                materia: b.materia,
-                dia_norm: b.dia_norm,
-                horario_texto: b.horario_texto
-            });
+    // Identificar todas las combinaciones únicas de materia + tipo
+    // Cada combinación representa una "asignatura" que el estudiante debe tomar
+    const uniqueSubjectTypes = [];
+    const seenKeys = new Set();
+    
+    allSections.forEach(s => {
+        const key = `${s.materia}|||${s.tipo}`;
+        if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            uniqueSubjectTypes.push({ materia: s.materia, tipo: s.tipo });
         }
     });
+    
+    console.log(`Combinaciones materia-tipo encontradas: ${uniqueSubjectTypes.length}`);
+    uniqueSubjectTypes.forEach(st => {
+        const sectionsCount = allSections.filter(s => s.materia === st.materia && s.tipo === st.tipo).length;
+        console.log(`  - ${st.materia} [${st.tipo}]: ${sectionsCount} secciones disponibles`);
+    });
+
+    // Verificar si dos secciones chocan en horario (mismo día y módulo)
+    function hasTimeConflict(section1, section2) {
+        if (section1.dia_norm !== section2.dia_norm) return false;
+        const mod1 = getModuleFromTimeRange(section1.horario_texto);
+        const mod2 = getModuleFromTimeRange(section2.horario_texto);
+        return mod1 === mod2 && mod1 !== null;
+    }
+
+    // Obtener la mejor sección disponible (con más vacantes) de una materia-tipo que no choque
+    function getBestAvailableSection(materia, tipo, currentBlocks) {
+        const candidates = allSections.filter(s => 
+            s.materia === materia && 
+            s.tipo === tipo && 
+            s.vac > 0
+        );
+
+        // Filtrar las que no chocan con ningún bloque ya asignado
+        const validCandidates = candidates.filter(candidate => {
+            return !currentBlocks.some(block => hasTimeConflict(candidate, block));
+        });
+
+        if (validCandidates.length === 0) return null;
+
+        // Retornar la sección con MÁS vacantes disponibles
+        validCandidates.sort((a, b) => b.vac - a.vac);
+        return validCandidates[0];
+    }
 
     const groups = [];
+    let iteration = 0;
+    const MAX_ITERATIONS = 100;
 
-    while (true) {
+    while (iteration < MAX_ITERATIONS) {
+        iteration++;
         const groupBlocks = [];
         const groupSizeCandidates = [];
 
-        for (const slot of templateSlots) {
-            // Todas las secciones posibles para esta materia en esta franja
-            const candidates = getRemainingBySubjectAndSlot(
-                slot.materia,
-                slot.dia_norm,
-                slot.horario_texto
+        // Intentar asignar una sección de cada materia-tipo al grupo
+        for (const subjectType of uniqueSubjectTypes) {
+            const bestSection = getBestAvailableSection(
+                subjectType.materia, 
+                subjectType.tipo, 
+                groupBlocks
             );
 
-            if (candidates.length === 0) {
-                // No hay más cupos para esta asignatura/franja;
-                // no podemos construir otro grupo completo
+            if (!bestSection) {
+                // No hay secciones disponibles sin choques para esta materia-tipo
+                console.log(`Iteración ${iteration}: No hay secciones disponibles para ${subjectType.materia} [${subjectType.tipo}]`);
                 groupBlocks.length = 0;
                 break;
             }
 
-            // Elegimos la sección con MÁS vacantes para ir equilibrando
-            candidates.sort((a, b) => b.vac - a.vac);
-            const chosen = candidates[0];
-
-            groupBlocks.push(chosen.ref);
-            groupSizeCandidates.push(chosen.vac);
+            groupBlocks.push(bestSection);
+            groupSizeCandidates.push(bestSection.vac);
         }
 
-        if (groupBlocks.length === 0 || groupSizeCandidates.length === 0) {
+        // Si no pudimos asignar todas las materias-tipo, terminamos
+        if (groupBlocks.length !== uniqueSubjectTypes.length || groupSizeCandidates.length === 0) {
+            console.log(`Iteración ${iteration}: No se pudo formar un bloque completo. Terminando.`);
             break;
         }
 
+        // El tamaño del bloque es el MÍNIMO de vacantes entre todas las secciones
         const groupSize = Math.min(...groupSizeCandidates);
-        if (groupSize <= 0) break;
-
-        // Descontar vacantes usadas
-        for (const gb of groupBlocks) {
-            const entry = remaining.find(r => r.ref === gb);
-            if (entry) entry.vac -= groupSize;
+        
+        if (groupSize <= 0) {
+            console.log(`Iteración ${iteration}: Tamaño de bloque es 0 o negativo. Terminando.`);
+            break;
         }
 
-        groups.push({ size: groupSize, blocks: groupBlocks, name: `Bloque ${groups.length + 1}` });
+        console.log(`\n--- Bloque ${groups.length + 1}: ${groupSize} cupos ---`);
+        groupBlocks.forEach(s => {
+            console.log(`  ${s.materia} [${s.tipo}] - NRC ${s.nrc} Secc ${s.seccion} - ${s.vac} vacantes -> quedarán ${s.vac - groupSize}`);
+        });
+
+        // Restar las vacantes usadas de todas las secciones asignadas al bloque
+        groupBlocks.forEach(section => {
+            section.vac -= groupSize;
+        });
+
+        // Guardar el bloque
+        groups.push({
+            size: groupSize,
+            blocks: groupBlocks.map(s => s.ref),
+            name: `Bloque ${groups.length + 1}`
+        });
     }
 
+    console.log(`\n=== Total de bloques generados: ${groups.length} ===\n`);
     return groups;
 }
+
 function getModuleFromTimeRange(rangeStr) {
     if (!rangeStr) return null;
     const parts = rangeStr.split('-');

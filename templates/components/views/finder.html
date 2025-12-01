@@ -52,8 +52,18 @@
 
     <div id="finder-results" class="hidden bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="p-4 border-b border-slate-100 flex justify-between items-center">
-            <h4 class="font-semibold text-slate-700">Resultados de búsqueda</h4>
-            <span id="finder-count" class="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">0 encontrados</span>
+            <div class="flex items-center gap-4">
+                <h4 class="font-semibold text-slate-700">Resultados de búsqueda</h4>
+                <span id="finder-count" class="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">0 encontrados</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-xs font-medium text-slate-500">Ordenar por capacidad:</label>
+                <select id="finder-sort" onchange="applySortToFinderResults()" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="none">Sin ordenar</option>
+                    <option value="asc">Menor a Mayor</option>
+                    <option value="desc">Mayor a Menor</option>
+                </select>
+            </div>
         </div>
         <div class="max-h-[500px] overflow-y-auto">
             <table class="w-full text-sm">
