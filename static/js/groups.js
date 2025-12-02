@@ -252,6 +252,11 @@ function buildGroupsForCareer(blocks) {
         horario_texto: b.horario_texto
     }));
 
+    console.log('Todas las secciones con vacantes:');
+    allSections.forEach(s => {
+        console.log(`  NRC ${s.nrc} - ${s.materia} [${s.tipo}] - ${s.vac} vacantes`);
+    });
+
     // Identificar todas las combinaciones únicas de materia + tipo
     // Cada combinación representa una "asignatura" que el estudiante debe tomar
     const uniqueSubjectTypes = [];
@@ -272,7 +277,14 @@ function buildGroupsForCareer(blocks) {
     });
 
     // Verificar si dos secciones chocan en horario (mismo día y módulo)
+    // Solo es conflicto si son de DIFERENTE materia o DIFERENTE tipo
     function hasTimeConflict(section1, section2) {
+        // Si son la misma materia, NO hay conflicto (pueden tener horarios iguales)
+        // Por ejemplo: COMUNICACION EFECTIVA [TEO] y COMUNICACION EFECTIVA [TAL]
+        // pueden estar al mismo tiempo porque son tipos diferentes de la misma materia
+        if (section1.materia === section2.materia) return false;
+        
+        // Si son materias diferentes, verificar si chocan en día y módulo
         if (section1.dia_norm !== section2.dia_norm) return false;
         const mod1 = getModuleFromTimeRange(section1.horario_texto);
         const mod2 = getModuleFromTimeRange(section2.horario_texto);
@@ -281,15 +293,41 @@ function buildGroupsForCareer(blocks) {
 
     // Obtener la mejor sección disponible (con más vacantes) de una materia-tipo que no choque
     function getBestAvailableSection(materia, tipo, currentBlocks) {
+        console.log(`    Buscando ${materia} [${tipo}]...`);
+        
+        // Primero ver todas las secciones de esta materia-tipo
+        const allMatchingSections = allSections.filter(s => 
+            s.materia === materia && 
+            s.tipo === tipo
+        );
+        console.log(`      Total secciones de esta materia-tipo: ${allMatchingSections.length}`);
+        allMatchingSections.forEach(s => {
+            console.log(`        NRC ${s.nrc} - Vacantes: ${s.vac}`);
+        });
+        
         const candidates = allSections.filter(s => 
             s.materia === materia && 
             s.tipo === tipo && 
             s.vac > 0
         );
 
-        // Filtrar las que no chocan con ningún bloque ya asignado
+        console.log(`      Candidatos con vacantes > 0: ${candidates.length}`);
+        candidates.forEach(c => {
+            console.log(`        NRC ${c.nrc} - ${c.vac} vacantes`);
+        });
+
+        // Filtrar las que no chocan con bloques de OTRAS materias ya asignados
         const validCandidates = candidates.filter(candidate => {
-            return !currentBlocks.some(block => hasTimeConflict(candidate, block));
+            const conflicts = currentBlocks.filter(block => hasTimeConflict(candidate, block));
+            if (conflicts.length > 0) {
+                console.log(`        NRC ${candidate.nrc} choca con: ${conflicts.map(c => `${c.materia} [${c.tipo}] NRC ${c.nrc}`).join(', ')}`);
+            }
+            return conflicts.length === 0;
+        });
+
+        console.log(`      Candidatos válidos sin choques: ${validCandidates.length}`);
+        validCandidates.forEach(v => {
+            console.log(`        NRC ${v.nrc} - ${v.vac} vacantes - VÁLIDO`);
         });
 
         if (validCandidates.length === 0) return null;
@@ -334,7 +372,10 @@ function buildGroupsForCareer(blocks) {
         }
 
         // El tamaño del bloque es el MÍNIMO de vacantes entre todas las secciones
+        console.log(`\n--- Calculando tamaño de Bloque ${groups.length + 1} ---`);
+        console.log(`Vacantes candidatas: [${groupSizeCandidates.join(', ')}]`);
         const groupSize = Math.min(...groupSizeCandidates);
+        console.log(`Mínimo calculado: ${groupSize}`);
         
         if (groupSize <= 0) {
             console.log(`Iteración ${iteration}: Tamaño de bloque es 0 o negativo. Terminando.`);
@@ -343,7 +384,7 @@ function buildGroupsForCareer(blocks) {
 
         console.log(`\n--- Bloque ${groups.length + 1}: ${groupSize} cupos ---`);
         groupBlocks.forEach(s => {
-            console.log(`  ${s.materia} [${s.tipo}] - NRC ${s.nrc} Secc ${s.seccion} - ${s.vac} vacantes -> quedarán ${s.vac - groupSize}`);
+            console.log(`  NRC ${s.nrc} - ${s.materia} [${s.tipo}] Secc ${s.seccion} - ${s.vac} vacantes -> quedarán ${s.vac - groupSize}`);
         });
 
         // Restar las vacantes usadas de todas las secciones asignadas al bloque

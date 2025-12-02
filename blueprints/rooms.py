@@ -146,7 +146,7 @@ def normalize_columns(df):
         "fecha_term": "fecha_term",
         "nombre_": "prof_nombre",
         "apellido": "prof_apellido",
-        "vacantes": "vacantes",
+        "cupo_disp": "vacantes",
     }
     df.rename(columns=column_mapping, inplace=True)
     return df
@@ -262,7 +262,7 @@ def parse_schedule_row(row):
                             "tipo": componente,
                             "modulo": mod_num,
                             "dia_norm": day,
-                            "vacantes": vacantes,
+                            "cupo_disp": vacantes,
                         }
                     )
     return entries

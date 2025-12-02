@@ -1,33 +1,52 @@
 import os
 from flask import Blueprint, request, jsonify, current_app
 import pandas as pd
-
+import math
 
 groups_bp = Blueprint("groups", __name__)
 
 
 def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
+    # 1. Limpieza inicial: minúsculas y quitar espacios
     df.columns = df.columns.str.strip().str.lower()
+
+    # 2. Renombrar columnas conflictivas si existen
+    if "vacantes" in df.columns:
+        # Si existe una columna llamada explícitamente 'vacantes' que NO es la que queremos, la apartamos
+        df.rename(columns={"vacantes": "vacantes_original"}, inplace=True)
+
+    if "carrera" in df.columns and "carrera_reserva" in df.columns:
+        df.rename(columns={"carrera": "carrera_original"}, inplace=True)
+
+    # 3. Mapeo Oficial
     mapping = {
+        # --- ASIGNATURA ---
         "nombre": "nombre_asignatura",
         "materia": "codigo_materia",
-        "sala": "ubicacion",
-        "carrera_reserva": "carrera",
-        "carrera reserva": "carrera",
-        "carrera": "carrera",
-        "hr_inicio": "inicio",
-        "hr_fin": "fin",
         "nrc": "nrc",
         "seccion": "seccion",
         "sección": "seccion",
         "n_curso": "n_curso",
-        "componente": "componente",
+        # --- TIPO DE ASIGNATURA (Aquí estaba el problema) ---
+        "componente": "tipo",  # MAPEO CLAVE: COMPONENTE -> TIPO
+        "tipo": "tipo",
+        "tip": "tipo",
+        # --- UBICACIÓN Y TIEMPO ---
+        "sala": "ubicacion",
+        "hr_inicio": "inicio",
+        "hr_fin": "fin",
         "fecha_ini": "fecha_ini",
         "fecha_term": "fecha_term",
+        # --- FILTROS ---
+        "carrera_reserva": "carrera",
+        "carrera": "carrera",
+        "ni_an": "ni_an",
+        # --- VACANTES (Prioridad: Cupo Disp) ---
+        "cupo_disp": "vacantes",
+        # --- DOCENTE ---
         "nombre_": "prof_nombre",
         "apellido": "prof_apellido",
-        "vacantes": "vacantes",
-        "ni_an": "ni_an",
+        # --- DÍAS ---
         "lunes": "lunes",
         "martes": "martes",
         "miercoles": "miercoles",
@@ -42,28 +61,20 @@ def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def normalize_time_format(time_str: str) -> str:
-    """Convierte '800' a '08:00', '1230' a '12:30', etc."""
-    time_str = time_str.strip().replace(".0", "")
-    if not time_str:
+    time_str = str(time_str).strip().replace(".0", "")
+    if not time_str or time_str.lower() == "nan":
         return ""
-    
-    # Si ya tiene formato correcto, devolverlo
     if ":" in time_str:
         return time_str
-    
-    # Intentar parsear formato sin dos puntos
-    if len(time_str) == 3:  # Ej: "800" -> "08:00"
+    if len(time_str) == 3:
         return f"0{time_str[0]}:{time_str[1:3]}"
-    elif len(time_str) == 4:  # Ej: "1230" -> "12:30"
+    elif len(time_str) == 4:
         return f"{time_str[0:2]}:{time_str[2:4]}"
-    
     return time_str
 
 
 def get_module_from_time(time_str: str) -> int:
-    """Mapea hora de inicio a número de módulo (1-8)"""
     time_str = normalize_time_format(time_str)
-    
     if time_str.startswith("08:00") or time_str.startswith("8:00"):
         return 1
     elif time_str.startswith("09:30") or time_str.startswith("9:30"):
@@ -88,33 +99,74 @@ def parse_groups_row(row: pd.Series):
     entries = []
     days = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
 
-    inicio_raw = str(row.get("inicio", "")).strip().replace(".0", "")
-    fin_raw = str(row.get("fin", "")).strip().replace(".0", "")
+    # Validar NRC
+    nrc_raw = row.get("nrc", "")
+    if pd.isna(nrc_raw) or str(nrc_raw).strip() in ("", "nan", "NaT", "None"):
+        return entries
+
+    # Helper para limpiar strings
+    def clean(key):
+        return str(row.get(key, "")).strip()
+
+    # Horarios
+    inicio_raw = clean("inicio").replace(".0", "")
+    fin_raw = clean("fin").replace(".0", "")
     inicio = normalize_time_format(inicio_raw)
     fin = normalize_time_format(fin_raw)
     horario_texto = f"{inicio} - {fin}" if inicio or fin else ""
     modulo = get_module_from_time(inicio)
 
+    # Datos Generales
     nombre_asignatura = str(row.get("nombre_asignatura", "Sin Nombre")).strip()
-    codigo_materia = str(row.get("codigo_materia", "")).strip()
-    ubicacion = str(row.get("ubicacion", "")).strip()
-    nrc = str(row.get("nrc", "")).strip().replace(".0", "")
-    seccion = str(row.get("seccion", "")).strip()
-    carrera = str(row.get("carrera", "")).strip()
-    n_curso = str(row.get("n_curso", "")).strip()
-    componente = str(row.get("componente", "")).strip()
+    ubicacion = clean("ubicacion")
+    nrc = clean("nrc").replace(".0", "")
+    seccion = clean("seccion")
+    carrera = clean("carrera")
+    n_curso = clean("n_curso")
+    codigo_materia = clean("codigo_materia")
+
+    # TIPO DE ASIGNATURA (CORREGIDO)
+    # Leemos la columna 'tipo' (que mapeamos desde COMPONENTE)
+    # Si está vacía, asumimos "TEO" por defecto, pero intentamos leer el valor real.
+    tipo_raw = clean("tipo")
+    tipo = tipo_raw.upper() if tipo_raw else "TEO"
+
+    # Filtro NI
+    ni_an = clean("ni_an").upper()
+    if ni_an == "NAN":
+        ni_an = ""
+
+    # --- EXTRACCIÓN DE VACANTES (VERSIÓN SIMPLIFICADA Y DEPURADA) ---
+    vacantes = 0
+
+    # 1. Obtener valor crudo
+    v_raw = row.get("vacantes", 0)
+
+    # 2. Depuración: Ver qué llega exactamente
+    # print(f"DEBUG VACANTES NRC {nrc}: Valor crudo = '{v_raw}' Tipo = {type(v_raw)}")
 
     try:
-        vacantes = int(row.get("vacantes", 0))
-    except Exception:
+        # Si es una Serie de Pandas (pasa a veces con columnas duplicadas), tomar el primer valor
+        if hasattr(v_raw, "iloc"):
+            v_raw = v_raw.iloc[0]
+
+        # Convertir a string, limpiar espacios y convertir
+        v_str = str(v_raw).strip()
+
+        if v_str and v_str.lower() != "nan":
+            # Convertir a float primero para manejar "15.0" y luego a int
+            vacantes = int(float(v_str))
+
+    except Exception as e:
+        print(f"ERROR leyendo vacantes NRC {nrc}: {e}")
         vacantes = 0
 
-    ni_an = str(row.get("ni_an", "")).strip().lower()
+    # ---------------------------------------------------------------
 
     for day in days:
         if day in row.index:
             val = str(row[day]).strip().lower()
-            if val not in ("nan", "", "none"):
+            if val and val not in ("nan", "none", ""):
                 entries.append(
                     {
                         "materia": nombre_asignatura,
@@ -124,8 +176,8 @@ def parse_groups_row(row: pd.Series):
                         "nrc": nrc,
                         "seccion": seccion,
                         "n_curso": n_curso,
-                        "componente": componente,
-                        "tipo": componente,
+                        "componente": tipo_raw,  # Guardamos el original también
+                        "tipo": tipo,  # Este es el que usa el JS (TEO, LAB, etc)
                         "dia_norm": day,
                         "horario_texto": horario_texto,
                         "modulo": modulo,
@@ -142,18 +194,8 @@ def process_groups_file(file_path: str):
         df = pd.read_excel(file_path)
         df = normalize_groups_columns(df)
 
-        if "carrera" not in df.columns or "ni_an" not in df.columns:
-            return None, "El archivo no contiene columnas CARRERA_RESERVA / NI_AN."
-
-        # Filtrar filas con carrera no vacía
-        df["carrera"] = df["carrera"].astype(str)
-        df = df[df["carrera"].str.strip() != ""]
-        df = df[~df["carrera"].str.lower().isin(["nan", "none", "nat"])]
-
-        # Normalizar NI_AN y filtrar solo NI
-        df["ni_an"] = df["ni_an"].astype(str)
-        df["ni_an_norm"] = df["ni_an"].str.strip().str.upper()
-        df = df[df["ni_an_norm"] == "NI"]
+        if "nrc" in df.columns:
+            df = df.dropna(subset=["nrc"])
 
         schedule_entries = []
         for _, row in df.iterrows():
@@ -161,6 +203,7 @@ def process_groups_file(file_path: str):
 
         return {"schedule_ni": schedule_entries}, None
     except Exception as e:
+        print(f"Error Fatal procesando grupos: {e}")
         return None, str(e)
 
 
@@ -168,7 +211,6 @@ def process_groups_file(file_path: str):
 def groups_upload():
     if "file" not in request.files:
         return jsonify({"error": "No file"}), 400
-
     file = request.files["file"]
     if file.filename == "":
         return jsonify({"error": "No file"}), 400
@@ -182,7 +224,6 @@ def groups_upload():
         data, error = process_groups_file(filepath)
         if error:
             return jsonify({"error": error}), 500
-
         return jsonify({"success": True, "data": data})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
