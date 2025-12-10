@@ -1,5 +1,43 @@
+/**
+ * rooms_reports.js - Módulo de Reportes de Salas
+ * ================================================
+ * 
+ * Estado: FUNCIONAL ✅
+ * 
+ * Funcionalidades:
+ * - Reporte de NRCs sin sala asignada
+ * - Reporte de salas sin docente asignado
+ * - Visualización en tablas con contador
+ * - Estados de carga y error
+ * 
+ * Dependencias:
+ * - Backend endpoints: /unassigned_nrcs, /rooms_without_teacher
+ * - Lucide Icons: Iconografía
+ * 
+ * Uso:
+ * - Se invoca desde rooms.js al navegar a las vistas de reportes
+ * - Carga automática al mostrar cada vista
+ */
 
-// --- FUNCIONES PARA NRCs SIN SALA ---
+// ===================================
+// REPORTE: NRCs SIN SALA ASIGNADA
+// ===================================
+
+/**
+ * Carga y muestra los NRCs que no tienen sala asignada.
+ * 
+ * Flujo:
+ * 1. Muestra estado de carga (spinner)
+ * 2. Llama a /unassigned_nrcs
+ * 3. Renderiza tabla con resultados
+ * 4. Actualiza contador en el título
+ * 
+ * Estados:
+ * - Carga: Spinner animado
+ * - Vacío: Ícono verde "✓ No hay NRCs sin sala"
+ * - Con datos: Tabla con NRC, sección, código, materia, componente, carrera
+ * - Error: Mensaje de error con ícono
+ */
 async function loadUnassignedNRCs() {
     const tbody = document.getElementById('unassigned-nrcs-list');
     const countSpan = document.getElementById('unassigned-count');
@@ -76,7 +114,29 @@ async function loadUnassignedNRCs() {
     }
 }
 
-// --- FUNCIONES PARA SALAS SIN DOCENTE ---
+// ===================================
+// REPORTE: SALAS SIN DOCENTE ASIGNADO
+// ===================================
+
+/**
+ * Carga y muestra las salas que no tienen docente asignado.
+ * 
+ * Flujo:
+ * 1. Muestra estado de carga (spinner)
+ * 2. Llama a /rooms_without_teacher
+ * 3. Renderiza tabla con resultados
+ * 4. Actualiza contador en el título
+ * 
+ * Estados:
+ * - Carga: Spinner animado
+ * - Vacío: Ícono verde "✓ No hay salas sin docente"
+ * - Con datos: Tabla con día, módulo, sala, carrera, NRC, sección, código, materia, componente, capacidad
+ * - Error: Mensaje de error con ícono
+ * 
+ * Información adicional:
+ * - Útil para identificar bloques de clase sin profesor asignado
+ * - Permite detectar inconsistencias en la asignación docente
+ */
 async function loadRoomsWithoutTeacher() {
     const tbody = document.getElementById('no-teacher-list');
     const countSpan = document.getElementById('no-teacher-count');

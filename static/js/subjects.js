@@ -1,8 +1,52 @@
-// subjects.js - Lógica del Buscador de Asignaturas
+/**
+ * subjects.js - Módulo de Buscador de Asignaturas
+ * ====================================================
+ * 
+ * Estado: FUNCIONAL ✅
+ * 
+ * Funcionalidades:
+ * - Búsqueda de asignaturas por NRC o sección
+ * - Vista de todas las programaciones de una asignatura
+ * - Navegación directa a horarios en el planificador
+ * - Agrupación por carrera, malla y semestre
+ * 
+ * Dependencias:
+ * - careerDatabase: Objeto global con datos de carreras (careers.js)
+ * - switchTab(): Función de navegación (main.js)
+ * - selectCareer(): Selección de carrera (careers.js)
+ * - renderCareerGrid(): Renderizado de grilla (careers.js)
+ * - Lucide Icons: Iconografía
+ * 
+ * Variables globales:
+ * - allSubjects: Array con todas las asignaturas únicas (NRC-Sección)
+ * - currentSelectedSubjectKey: Clave de asignatura seleccionada (para mantener selección)
+ */
 
-let allSubjects = []; // Array plano de todas las asignaturas encontradas
-let currentSelectedSubjectKey = null; // Para rastrear la selección actual
+// ===================================
+// VARIABLES GLOBALES DEL MÓDULO
+// ===================================
+let allSubjects = [];  // Array plano de todas las asignaturas encontradas
+let currentSelectedSubjectKey = null;  // Para rastrear la selección actual (NRC-SEC)
 
+/**
+ * Carga todas las asignaturas desde la base de datos de carreras.
+ * Llamada automáticamente cuando se modifica la planificación de carreras.
+ * 
+ * Proceso:
+ * 1. Recorre careerDatabase completo
+ * 2. Extrae bloques únicos por NRC-Sección
+ * 3. Agrupa todas las ocurrencias de cada asignatura
+ * 4. Renderiza lista actualizada
+ * 5. Mantiene vista de detalles si había selección previa
+ * 
+ * Estructura de asignatura:
+ * {
+ *   nrc: string,
+ *   seccion: string,
+ *   tipo: string (TEO/LAB/TAL/SIM),
+ *   occurrences: Array<{career, careerName, mesh, semester, day, module, type}>
+ * }
+ */
 function loadSubjectsFromDatabase() {
     // Recorrer careerDatabase y extraer todas las asignaturas únicas
     const subjectsMap = new Map(); // Key: NRC-SEC
@@ -51,6 +95,10 @@ function loadSubjectsFromDatabase() {
     }
 }
 
+/**
+ * Limpia la vista de detalles de asignatura.
+ * Muestra el estado vacío ("Selecciona una asignatura...").
+ */
 function clearSubjectDetails() {
     currentSelectedSubjectKey = null;
     const emptyState = document.getElementById('subject-detail-empty');
@@ -60,6 +108,18 @@ function clearSubjectDetails() {
     if(contentState) contentState.classList.add('hidden');
 }
 
+/**
+ * Renderiza la lista de asignaturas en el panel izquierdo.
+ * 
+ * @param {Array} subjects - Array de objetos de asignaturas a mostrar
+ * 
+ * Muestra:
+ * - NRC y sección en formato distintivo
+ * - Contador de bloques programados
+ * - Efecto hover para selección
+ * 
+ * Estado vacío: Mensaje cuando no hay asignaturas
+ */
 function renderSubjectList(subjects) {
     const container = document.getElementById('subject-list-container');
     if (!container) return;
@@ -89,6 +149,14 @@ function renderSubjectList(subjects) {
     });
 }
 
+/**
+ * Filtra las asignaturas según el texto de búsqueda.
+ * 
+ * Búsqueda:
+ * - Insensible a mayúsculas/minúsculas
+ * - Busca en NRC y sección
+ * - Resultados en tiempo real (keyup event)
+ */
 function filterSubjects() {
     const query = document.getElementById('subject-search-input').value.toUpperCase();
     const filtered = allSubjects.filter(s => 
@@ -98,6 +166,23 @@ function filterSubjects() {
     renderSubjectList(filtered);
 }
 
+/**
+ * Muestra los detalles de una asignatura en el panel derecho.
+ * 
+ * @param {Object} subject - Objeto de asignatura con sus ocurrencias
+ * 
+ * Vista:
+ * 1. Encabezado con NRC y Sección
+ * 2. Cards agrupadas por contexto (Carrera + Malla + Semestre)
+ * 3. Cada card muestra:
+ *    - Nombre de carrera
+ *    - Malla y semestre
+ *    - Bloques ordenados por día y módulo
+ *    - Botón de navegación al planificador
+ * 
+ * Interacción:
+ * - Clic en card: navega al horario en el planificador
+ */
 function showSubjectDetails(subject) {
     currentSelectedSubjectKey = `${subject.nrc}-${subject.seccion}`;
 
@@ -164,6 +249,22 @@ function showSubjectDetails(subject) {
     lucide.createIcons();
 }
 
+/**
+ * Navega al planificador de horarios con la carrera, malla y semestre especificados.
+ * 
+ * @param {string} careerCode - Código de la carrera
+ * @param {string} mesh - Año de la malla curricular
+ * @param {number} semester - Número de semestre
+ * 
+ * Flujo:
+ * 1. Cambia a pestaña 'career-schedule'
+ * 2. Selecciona la carrera
+ * 3. Espera a que se actualicen los selectores (100ms)
+ * 4. Selecciona malla y semestre
+ * 5. Renderiza la grilla de horarios
+ * 
+ * Permite: Ver contexto completo de la asignatura en su horario
+ */
 function navigateToSchedule(careerCode, mesh, semester) {
     // 1. Cambiar a la pestaña del planificador
     switchTab('career-schedule');
@@ -184,6 +285,14 @@ function navigateToSchedule(careerCode, mesh, semester) {
     }, 100);
 }
 
+/**
+ * Convierte la primera letra de un string a mayúscula.
+ * 
+ * @param {string} str - Texto a capitalizar
+ * @returns {string} - Texto con primera letra mayúscula
+ * 
+ * Ejemplo: "lunes" → "Lunes"
+ */
 function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1);
 }

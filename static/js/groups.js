@@ -1,9 +1,59 @@
-// groups.js - Lógica para Generador de Bloques (1° Año)
+/**
+ * groups.js - Módulo de Generador de Bloques para Primer Año
+ * ===========================================================
+ * 
+ * Estado: NO FUNCIONAL 🔴 (EXPERIMENTAL)
+ * 
+ * ADVERTENCIA CRÍTICA:
+ * Este módulo intenta automatizar la generación de bloques de estudiantes
+ * de primer año, pero NO refleja el proceso real de registro académico.
+ * 
+ * Problemas identificados:
+ * - Requiere múltiples iteraciones con ajustes manuales
+ * - No considera restricciones de capacidad de salas
+ * - No maneja conflictos de horario complejos
+ * - No integra requisitos de prerrequisitos
+ * - Falta validación de disponibilidad docente
+ * 
+ * RECOMENDACIÓN: NO usar en producción sin revisión completa del algoritmo
+ * y validación con el departamento de registro académico.
+ * 
+ * Ver README.md sección "Limitaciones Actuales" para más detalles.
+ * 
+ * Funcionalidades implementadas:
+ * - Carga de Excel con datos de bloques de primer año
+ * - Selector de carreras filtrado por NI (Nuevo Ingreso)
+ * - Generación experimental de agrupaciones
+ * - Vista de horarios generados
+ * - Exportación de resultados (sin validar)
+ * 
+ * Variables globales:
+ * - globalGroupsData: Datos cargados desde el Excel de bloques
+ * - globalBuiltGroups: Grupos generados (array de objetos)
+ * - savedGroupNames: Nombres personalizados por carrera
+ * 
+ * Dependencias:
+ * - toggleLoading(): Indicador de carga (main.js, opcional)
+ * - Lucide Icons: Iconografía
+ */
 
-let globalGroupsData = null;
-let globalBuiltGroups = [];
-let savedGroupNames = {}; // Almacena nombres por carrera: { "Carrera": ["Nombre1", "Nombre2", ...] }
+// ===================================
+// VARIABLES GLOBALES DEL MÓDULO
+// ===================================
+let globalGroupsData = null;  // Datos del Excel procesado por backend
+let globalBuiltGroups = [];  // Grupos de estudiantes generados
+let savedGroupNames = {};  // Almacena nombres por carrera: { "Carrera": ["Nombre1", ...] }
 
+/**
+ * Manejador del evento change del input de archivo.
+ * Actualiza el estado del botón de subida según haya archivo seleccionado.
+ * 
+ * @param {Event} e - Evento change del input file
+ * 
+ * Estados:
+ * - Con archivo: Botón activo (bg-purple-600)
+ * - Sin archivo: Botón desactivado (bg-purple-200)
+ */
 function onGroupsFileChange(e) {
     const fileInput = e.target;
     const btn = document.getElementById('groups-upload-submit');
@@ -31,6 +81,21 @@ function onGroupsFileChange(e) {
     }
 }
 
+/**
+ * Inicializa la vista del generador de bloques.
+ * Se ejecuta al cambiar a la pestaña de bloques.
+ * 
+ * Flujo:
+ * 1. Verifica si ya hay datos cargados
+ * 2. Si no hay datos, intenta cargar Excel desde formulario
+ * 3. Envía POST a /groups/upload con el archivo
+ * 4. Procesa respuesta y llena selector de carreras
+ * 
+ * ADVERTENCIA: El Excel debe tener estructura específica con columnas:
+ * - ni_an: Indicador de Nuevo Ingreso (NI/AN)
+ * - carrera: Nombre de la carrera
+ * - Otros campos de bloques horarios
+ */
 async function initGroupsView() {
     console.log("--- Iniciando Vista de Bloques (1° Año) ---");
 
@@ -91,6 +156,20 @@ async function initGroupsView() {
     }
 }
 
+/**
+ * Llena el selector de carreras con las que tienen bloques NI.
+ * 
+ * @param {Array} scheduleNi - Array de bloques del Excel procesado
+ * 
+ * Filtrado:
+ * - Solo bloques con ni_an === 'NI'
+ * - Solo carreras con al menos un bloque NI
+ * - Carreras únicas ordenadas alfabéticamente
+ * 
+ * Estado visual:
+ * - Con datos: selector activo con estilo púrpura
+ * - Sin datos: selector deshabilitado con mensaje
+ */
 function populateCareerSelector(scheduleNi) {
     const selector = document.getElementById('groups-career-selector');
     if (!selector) return;
@@ -125,6 +204,24 @@ function populateCareerSelector(scheduleNi) {
     });
 }
 
+/**
+ * Genera los bloques de estudiantes para una carrera seleccionada.
+ * 
+ * ADVERTENCIA: Este algoritmo es EXPERIMENTAL y NO debe usarse en producción.
+ * 
+ * Proceso:
+ * 1. Filtra bloques de la carrera con NI
+ * 2. Identifica asignaturas únicas
+ * 3. Agrupa bloques por asignatura
+ * 4. Genera combinaciones de bloques compatibles (sin conflictos horarios)
+ * 5. Renderiza tarjetas con los grupos generados
+ * 
+ * Limitaciones conocidas:
+ * - No considera capacidad máxima de salas
+ * - Puede generar grupos con conflictos no detectados
+ * - No valida disponibilidad de docentes
+ * - Algoritmo greedy sin optimización global
+ */
 function generateStudentGroups() {
     const career = document.getElementById('groups-career-selector').value;
     const container = document.getElementById('groups-container');
@@ -229,11 +326,27 @@ function generateStudentGroups() {
     });
 }
 
-// Construye bloques para una carrera considerando:
-// 1. Cada estudiante toma TODAS las materias disponibles
-// 2. De cada materia, toma TODAS las secciones (una por tipo: TEO, LAB, TAL, SIM)
-// 3. Tamaño del bloque = mínimo de vacantes entre todas las secciones
-// 4. Cuando una sección se agota, se usa la siguiente disponible de ese materia-tipo
+/**
+ * Construye bloques de estudiantes para una carrera.
+ * 
+ * ADVERTENCIA CRÍTICA: Este algoritmo es una simplificación que NO refleja
+ * el proceso real de registro académico.
+ * 
+ * Lógica:
+ * 1. Identifica materias únicas y sus tipos (TEO/LAB/TAL/SIM)
+ * 2. Para cada bloque:
+ *    - Toma una sección de cada materia-tipo sin conflictos horarios
+ *    - Tamaño del bloque = mínimo de vacantes entre secciones
+ * 3. Descuenta vacantes usadas y repite hasta agotar
+ * 
+ * Algoritmo greedy:
+ * - No optimiza asignación global
+ * - Puede dejar secciones sin uso óptimo
+ * - No considera preferencias de estudiantes
+ * 
+ * @param {Array} blocks - Array de bloques horarios de la carrera
+ * @returns {Array} - Array de objetos {size, blocks, name}
+ */
 function buildGroupsForCareer(blocks) {
     if (!blocks || blocks.length === 0) return [];
 
@@ -404,6 +517,22 @@ function buildGroupsForCareer(blocks) {
     return groups;
 }
 
+/**
+ * Convierte un rango horario (ej: "08:00-09:20") a número de módulo (1-8).
+ * 
+ * @param {string} rangeStr - Rango horario en formato "HH:MM-HH:MM" o "HMM-HMM"
+ * @returns {number|null} - Número de módulo o null si no se puede determinar
+ * 
+ * Mapeo:
+ * - 08:00 → M1
+ * - 09:30 → M2
+ * - 11:00 → M3
+ * - 12:30 → M4
+ * - 14:00 → M5
+ * - 15:30 → M6
+ * - 17:00 → M7
+ * - 18:30 → M8
+ */
 function getModuleFromTimeRange(rangeStr) {
     if (!rangeStr) return null;
     const parts = rangeStr.split('-');
@@ -432,7 +561,17 @@ function getModuleFromTimeRange(rangeStr) {
     return null;
 }
 
-// Muestra el horario escolar de un grupo en un modal propio
+/**
+ * Muestra el horario escolar de un grupo en un modal.
+ * 
+ * @param {number} groupIndex - Índice del grupo en globalBuiltGroups
+ * 
+ * Estructura:
+ * - Título con nombre del bloque y carrera
+ * - Grilla 8x6 (módulos x días)
+ * - Bloques coloreados por tipo
+ * - Información de sala y docente (si disponible)
+ */
 function showGroupTimetable(groupIndex) {
     if (!globalBuiltGroups || !globalBuiltGroups[groupIndex]) return;
 
@@ -516,6 +655,9 @@ function showGroupTimetable(groupIndex) {
     modal.classList.add('flex');
 }
 
+/**
+ * Cierra el modal del horario de grupo.
+ */
 function closeGroupTimetableModal() {
     const modal = document.getElementById('modal-group-timetable');
     if (!modal) return;
@@ -523,6 +665,18 @@ function closeGroupTimetableModal() {
     modal.classList.remove('flex');
 }
 
+/**
+ * Guarda el nombre personalizado de un grupo.
+ * Almacena en savedGroupNames por carrera y índice de grupo.
+ * 
+ * @param {number} groupIndex - Índice del grupo en globalBuiltGroups
+ * @param {string} newName - Nuevo nombre ingresado por el usuario
+ * 
+ * Persistencia:
+ * - Actualiza globalBuiltGroups[groupIndex].name
+ * - Guarda en savedGroupNames[carrera][índice]
+ * - Si el nombre está vacío, restaura el predeterminado
+ */
 function saveGroupName(groupIndex, newName) {
     if (!globalBuiltGroups || !globalBuiltGroups[groupIndex]) return;
     

@@ -1,13 +1,65 @@
-// careers.js - Lógica del Módulo de Carreras
-let careerDatabase = {}; 
-let careerPendingDelete = null;
-let currentPlanningPeriod = 1; // 1 = Impares, 2 = Pares
+/**
+ * careers.js - Módulo de Gestión de Carreras y Planificación Académica
+ * ======================================================================
+ * 
+ * Estado: EN DESARROLLO ⚠️
+ * 
+ * ADVERTENCIA: Este módulo está en fase experimental y requiere:
+ * - Sistema de autenticación con roles de usuario
+ * - Base de datos persistente (actualmente usa memoria)
+ * - Arquitectura multiusuario
+ * Ver README.md sección "Limitaciones Actuales" para más detalles.
+ * 
+ * Funcionalidades implementadas:
+ * - CRUD completo de carreras universitarias
+ * - Configuración de períodos académicos (semestres pares/impares)
+ * - Planificador visual de horarios (tipo grilla)
+ * - Gestión de bloques de clases (añadir, editar, eliminar)
+ * - Detección de conflictos de horario
+ * - Buscador de asignaturas por NRC
+ * - Autocompletado de códigos de materia
+ * - Gestión de mallas curriculares
+ * 
+ * Variables globales:
+ * - careerDatabase: Objeto con todas las carreras y sus planificaciones
+ * - careerPendingDelete: Código de carrera pendiente de eliminación
+ * - currentPlanningPeriod: 1=Impares, 2=Pares
+ * - currentEditBlock: Bloque siendo editado en modal
+ * - blockIndexToDelete: Índice del bloque a eliminar
+ * 
+ * Dependencias:
+ * - main.js: switchTab(), showStatusModal()
+ * - subjects.js: loadSubjectsFromDatabase()
+ * - Lucide Icons: Iconografía
+ */
 
+// ===================================
+// VARIABLES GLOBALES DEL MÓDULO
+// ===================================
+let careerDatabase = {};  // Almacena todas las carreras y planificaciones
+let careerPendingDelete = null;  // Código de carrera a eliminar (para confirmación)
+let currentPlanningPeriod = 1;  // 1 = Semestres Impares (1,3,5,7,9), 2 = Pares (2,4,6,8,10)
+
+// ===================================
+// INICIALIZACIÓN AL CARGAR LA PÁGINA
+// ===================================
 document.addEventListener('DOMContentLoaded', () => {
     loadCareers();
 });
 
-// --- API CLIENTE ---
+// ===================================
+// API CLIENTE - COMUNICACIÓN CON BACKEND
+// ===================================
+
+/**
+ * Carga todas las carreras desde el backend.
+ * Se ejecuta automáticamente al cargar la página.
+ * 
+ * Actualiza:
+ * - careerDatabase: Con datos del servidor
+ * - currentPlanningPeriod: Con el período activo
+ * - UI: Renderiza lista de carreras y actualiza selectores
+ */
 async function loadCareers() {
     try {
         const res = await fetch('/get_careers');
@@ -22,12 +74,28 @@ async function loadCareers() {
     } catch(e) { console.error("Error cargando carreras", e); }
 }
 
-// --- CONFIGURACIÓN DE PERIODO ---
+// ===================================
+// CONFIGURACIÓN DE PERÍODO ACADÉMICO
+// ===================================
+
+/**
+ * Abre el modal para configurar el período académico.
+ * Permite alternar entre semestres pares e impares.
+ */
 function openPeriodConfigModal() {
     document.getElementById('modal-period-config').classList.remove('hidden');
     updatePeriodUI();
 }
 
+/**
+ * Configura el período académico activo en el backend.
+ * 
+ * @param {number} period - 1 para semestres impares, 2 para pares
+ * 
+ * Efecto en UI:
+ * - Filtra los selectores de semestre para mostrar solo impares o pares
+ * - Actualiza la etiqueta del botón de período
+ */
 async function setPlanningPeriod(period) {
     try {
         const res = await fetch('/set_planning_period', {
@@ -45,6 +113,14 @@ async function setPlanningPeriod(period) {
     } catch(e) { console.error("Error setting period", e); }
 }
 
+/**
+ * Actualiza la interfaz para reflejar el período académico activo.
+ * 
+ * Cambios visuales:
+ * - Etiqueta del botón principal (1° o 2° Semestre)
+ * - Indicador visual en el modal de configuración
+ * - Estilos de los botones de selección
+ */
 function updatePeriodUI() {
     // Actualizar etiqueta en el botón principal
     const label = document.getElementById('current-period-label');
@@ -61,7 +137,22 @@ function updatePeriodUI() {
     }
 }
 
-// --- VISTA 1: LISTADO (Sin cambios en esta parte) ---
+// ===================================
+// VISTA 1: LISTADO DE CARRERAS
+// ===================================
+
+/**
+ * Renderiza la tabla con todas las carreras disponibles.
+ * 
+ * Muestra:
+ * - Código de la carrera
+ * - Nombre completo
+ * - Número de semestres
+ * - Mallas curriculares activas
+ * - Botones de acción (Editar, Ver Horarios, Eliminar)
+ * 
+ * Estado vacío: Muestra mensaje cuando no hay carreras
+ */
 function renderCareerListTable() {
     const tbody = document.getElementById('career-list-body');
     const empty = document.getElementById('career-list-empty');
@@ -90,7 +181,10 @@ function renderCareerListTable() {
     if(window.lucide) lucide.createIcons();
 }
 
-// --- CRUD Carreras (Funciones ya existentes, mantenerlas) ---
+/**
+ * Abre el modal para añadir una nueva carrera.
+ * Limpia el formulario y prepara la UI para entrada de datos.
+ */
 function openCareerConfigModal() {
     document.getElementById('modal-career-config').classList.remove('hidden');
     document.getElementById('cfg-code').value = '';
@@ -100,6 +194,16 @@ function openCareerConfigModal() {
     renderMeshCheckboxes('cfg-meshes-container', []);
 }
 
+/**
+ * Abre el modal para editar una carrera existente.
+ * 
+ * @param {string} code - Código de la carrera a editar
+ * 
+ * Precarga:
+ * - Nombre actual
+ * - Número de semestres
+ * - Mallas curriculares activas (checkboxes marcados)
+ */
 function openEditCareerModal(code) {
     const career = careerDatabase[code];
     if (!career) return;
@@ -111,12 +215,34 @@ function openEditCareerModal(code) {
     renderMeshCheckboxes('edit-meshes-container', career.mallas || []);
 }
 
+/**
+ * Convierte un string a formato Title Case.
+ * 
+ * @param {string} str - Texto a convertir
+ * @returns {string} - Texto con primera letra de cada palabra en mayúscula
+ * 
+ * Ejemplo: "ingeniería civil informática" → "Ingeniería Civil Informática"
+ */
 function toTitleCase(str) {
     return str.replace(/\w\S*/g, function(txt){
         return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
     });
 }
 
+/**
+ * Guarda una nueva carrera en el sistema.
+ * 
+ * Validaciones:
+ * - Código y nombre no vacíos
+ * - Al menos una malla curricular seleccionada
+ * 
+ * Flujo:
+ * 1. Lee datos del formulario
+ * 2. Formatea nombre a Title Case
+ * 3. Envía POST a /save_career
+ * 4. Actualiza careerDatabase y UI
+ * 5. Cierra modal
+ */
 async function saveCareerConfig() {
     const code = document.getElementById('cfg-code').value.toUpperCase();
     const nameRaw = document.getElementById('cfg-name').value;
@@ -143,6 +269,12 @@ async function saveCareerConfig() {
     } catch(e) { alert("Error de conexión"); }
 }
 
+/**
+ * Guarda los cambios de una carrera editada.
+ * 
+ * Similar a saveCareerConfig pero usa código existente.
+ * Permite cambiar nombre, semestres y mallas curriculares.
+ */
 async function saveEditedCareer() {
     const code = document.getElementById('edit-code').value.toUpperCase();
     const nameRaw = document.getElementById('edit-name').value;
@@ -169,12 +301,33 @@ async function saveEditedCareer() {
     } catch(e) { alert("Error de conexión"); }
 }
 
+/**
+ * Abre el modal de confirmación para eliminar una carrera.
+ * 
+ * @param {string} code - Código de la carrera a eliminar
+ * 
+ * Seguridad:
+ * - Muestra nombre completo para confirmación visual
+ * - Requiere clic explícito en "Confirmar"
+ */
 function promptDeleteCareer(code) {
     careerPendingDelete = code;
     document.getElementById('del-career-name').innerText = careerDatabase[code].nombre;
     document.getElementById('modal-delete-career').classList.remove('hidden');
 }
 
+/**
+ * Ejecuta la eliminación de la carrera pendiente.
+ * 
+ * ADVERTENCIA: Eliminación permanente sin papelera de reciclaje.
+ * Se pierde toda la planificación de horarios asociada.
+ * 
+ * Flujo:
+ * 1. Envía DELETE a /delete_career
+ * 2. Elimina del careerDatabase local
+ * 3. Actualiza tabla y selectores
+ * 4. Cierra modal
+ */
 async function confirmDeleteCareer() {
     if(!careerPendingDelete) return;
     try {
@@ -191,8 +344,19 @@ async function confirmDeleteCareer() {
     } catch(e) { alert("Error al eliminar"); }
 }
 
-// --- VISTA 2: PLANIFICADOR (Horarios) ---
+// ===================================
+// VISTA 2: PLANIFICADOR DE HORARIOS
+// ===================================
 
+/**
+ * Navega a la vista del planificador de horarios.
+ * 
+ * @param {string} code - Código de la carrera a planificar
+ * 
+ * Efecto:
+ * - Cambia a pestaña 'career-schedule'
+ * - Carga la planificación de la carrera
+ */
 function goToSchedule(code) {
     if(window.switchTab) {
         switchTab('career-schedule');
@@ -200,6 +364,17 @@ function goToSchedule(code) {
     }
 }
 
+/**
+ * Actualiza los selectores de carrera en todas las vistas.
+ * 
+ * Propósito:
+ * - Sincronizar cambios en careerDatabase con la UI
+ * - Mantener consistencia después de CRUD
+ * 
+ * Actualiza:
+ * - Lista de opciones en el buscador
+ * - Estado del botón de añadir bloques
+ */
 function updateScheduleSelectors() {
     // Inicializar lista de opciones para el buscador
     const optionsContainer = document.getElementById('schedule-career-options');
@@ -227,17 +402,32 @@ function updateScheduleSelectors() {
     }
 }
 
-// --- FUNCIONES DEL BUSCADOR DE CARRERAS ---
+/**
+ * Muestra el dropdown de opciones de carreras.
+ * Se activa al hacer clic en el campo de búsqueda.
+ */
 function showCareerOptions() {
     document.getElementById('schedule-career-options').classList.remove('hidden');
 }
 
+/**
+ * Oculta el dropdown con un pequeño delay.
+ * Permite hacer clic en opciones antes de que se oculte.
+ */
 function hideCareerOptionsDelayed() {
     setTimeout(() => {
         document.getElementById('schedule-career-options').classList.add('hidden');
     }, 200);
 }
 
+/**
+ * Filtra las opciones de carreras según el texto ingresado.
+ * 
+ * Búsqueda:
+ * - Insensible a mayúsculas/minúsculas
+ * - Busca en código y nombre de carrera
+ * - Resultados en tiempo real (keyup event)
+ */
 function filterCareerOptions() {
     const query = document.getElementById('schedule-career-search').value.toUpperCase();
     const options = document.getElementById('schedule-career-options').children;
@@ -253,6 +443,17 @@ function filterCareerOptions() {
     showCareerOptions();
 }
 
+/**
+ * Selecciona una carrera del dropdown y carga su planificación.
+ * 
+ * @param {string} code - Código de la carrera seleccionada
+ * 
+ * Efecto:
+ * - Actualiza campo de búsqueda con nombre completo
+ * - Oculta dropdown
+ * - Carga la grilla de horarios
+ * - Habilita botón de añadir bloques
+ */
 function selectCareer(code) {
     const selector = document.getElementById('schedule-career-selector');
     const searchInput = document.getElementById('schedule-career-search');
@@ -264,6 +465,18 @@ function selectCareer(code) {
     }
 }
 
+/**
+ * Habilita o deshabilita el botón de añadir bloque.
+ * 
+ * Requiere:
+ * - Carrera seleccionada
+ * - Malla curricular seleccionada
+ * - Semestre seleccionado
+ * 
+ * Cambia:
+ * - Estado disabled del botón
+ * - Estilos visuales (color, cursor)
+ */
 function updateAddButtonState() {
     const code = document.getElementById('schedule-career-selector').value;
     const malla = document.getElementById('schedule-malla-selector').value;
@@ -283,6 +496,17 @@ function updateAddButtonState() {
     }
 }
 
+/**
+ * Actualiza los filtros (malla y semestre) según la carrera seleccionada.
+ * 
+ * Lógica:
+ * 1. Lee carrera seleccionada
+ * 2. Llena selector de mallas con las activas
+ * 3. Llena selector de semestres según período académico
+ *    - Período 1: Solo semestres impares (1,3,5,7,9)
+ *    - Período 2: Solo semestres pares (2,4,6,8,10)
+ * 4. Si solo hay una malla, la selecciona automáticamente
+ */
 function updateScheduleFilters() {
     const code = document.getElementById('schedule-career-selector').value;
     const mallaSel = document.getElementById('schedule-malla-selector');
@@ -328,6 +552,26 @@ function updateScheduleFilters() {
     }
 }
 
+/**
+ * Renderiza la grilla visual del planificador de horarios.
+ * 
+ * Estructura:
+ * - 8 filas (módulos 1-8 con horarios)
+ * - 6 columnas (lunes a sábado)
+ * - Bloques de clases posicionados en celdas correspondientes
+ * 
+ * Colores por tipo:
+ * - TEO: Azul (teoría)
+ * - LAB: Naranja (laboratorio)
+ * - TAL: Verde (taller)
+ * - SIM: Morado (simulación)
+ * 
+ * Interacción:
+ * - Clic en bloque: abre modal de edición
+ * - Hover en bloque: muestra botón de eliminar
+ * 
+ * IMPORTANTE: Guarda originalIndex para permitir eliminación correcta
+ */
 function renderCareerGrid() {
     const code = document.getElementById('schedule-career-selector').value;
     const malla = document.getElementById('schedule-malla-selector').value;
@@ -406,8 +650,21 @@ function renderCareerGrid() {
     if(window.lucide) lucide.createIcons();
 }
 
-// --- FUNCIONES NUEVAS: AÑADIR BLOQUE ---
+// ===================================
+// GESTIÓN DE BLOQUES (AÑADIR/EDITAR)
+// ===================================
 
+/**
+ * Abre el modal para añadir un nuevo bloque de clase.
+ * 
+ * Validación previa:
+ * - Verifica que haya carrera, malla y semestre seleccionados
+ * - Si falta alguno, muestra modal de advertencia con lista
+ * 
+ * Prepara:
+ * - Focus en campo NRC para entrada rápida
+ * - Formulario limpio
+ */
 function openAddBlockModal() {
     const code = document.getElementById('schedule-career-selector').value;
     const malla = document.getElementById('schedule-malla-selector').value;
@@ -431,6 +688,17 @@ function openAddBlockModal() {
     document.getElementById('block-nrc').focus();
 }
 
+/**
+ * Selecciona el tipo de bloque (TEO/LAB/TAL/SIM).
+ * 
+ * @param {string} type - Tipo: TEO, LAB, TAL o SIM
+ * @param {HTMLElement} btn - Botón clickeado
+ * 
+ * Efecto visual:
+ * - Resalta el botón seleccionado con color temático
+ * - Deselecciona los demás botones
+ * - Actualiza el input hidden 'block-type'
+ */
 function selectBlockType(type, btn) {
     document.querySelectorAll('.type-btn').forEach(b => {
         b.className = "type-btn border border-slate-200 text-slate-500 hover:bg-slate-50 py-2 rounded text-xs transition";
@@ -446,6 +714,10 @@ function selectBlockType(type, btn) {
     document.getElementById('block-type').value = type;
 }
 
+/**
+ * Similar a selectBlockType pero para el modal de edición.
+ * Actualiza el campo 'edit-block-type' en lugar de 'block-type'.
+ */
 function selectEditBlockType(type, btn) {
     document.querySelectorAll('.edit-type-btn').forEach(b => {
         b.className = "edit-type-btn border border-slate-200 text-slate-500 hover:bg-slate-50 py-2 rounded text-xs transition";
@@ -461,6 +733,22 @@ function selectEditBlockType(type, btn) {
     document.getElementById('edit-block-type').value = type;
 }
 
+/**
+ * Envía el nuevo bloque al backend para ser guardado.
+ * 
+ * Flujo:
+ * 1. Lee datos del formulario (carrera, malla, semestre)
+ * 2. Obtiene NRC y sección (desde select o input según modo)
+ * 3. Lee tipo, día y módulo
+ * 4. Valida campos requeridos
+ * 5. Envía POST a /add_block
+ * 6. Actualiza planificación local
+ * 7. Rerenderiza grilla y cierra modal
+ * 
+ * Modos de entrada NRC:
+ * - Select: Usa buscador de asignaturas (autocomplete)
+ * - Input: Entrada manual de NRC y sección
+ */
 async function submitNewBlock() {
     const code = document.getElementById('schedule-career-selector').value;
     const malla = document.getElementById('schedule-malla-selector').value;
@@ -561,6 +849,14 @@ async function submitNewBlock() {
     }
 }
 
+/**
+ * Cierra el modal de añadir bloque y limpia todos los campos.
+ * 
+ * Resetea:
+ * - Código de materia y número de curso
+ * - NRC y sección (inputs y selects)
+ * - Contenedor de días/módulos a una sola fila
+ */
 function closeAddBlockModal() {
     document.getElementById('modal-add-block').classList.add('hidden');
     document.getElementById('block-subject-code').value = '';
@@ -609,6 +905,15 @@ function closeAddBlockModal() {
     }
 }
 
+/**
+ * Añade una nueva fila de día/módulo en el modal.
+ * Permite crear bloques en múltiples horarios simultáneamente.
+ * 
+ * Efecto:
+ * - Crea nueva fila con selectores de día y módulo
+ * - Muestra botones de eliminar si hay más de una fila
+ * - Refresca iconografía Lucide
+ */
 function addDayModuleRow() {
     const container = document.getElementById('day-module-container');
     const newRow = document.createElement('div');
@@ -646,6 +951,14 @@ function addDayModuleRow() {
     }
 }
 
+/**
+ * Elimina una fila de día/módulo del modal.
+ * 
+ * @param {HTMLElement} btn - Botón de eliminar clickeado
+ * 
+ * Protección:
+ * - No permite eliminar si solo hay una fila (mínimo 1 horario)
+ */
 function removeDayModuleRow(btn) {
     const row = btn.closest('.day-module-row');
     const container = document.getElementById('day-module-container');
@@ -657,6 +970,13 @@ function removeDayModuleRow(btn) {
     }
 }
 
+/**
+ * Actualiza la visibilidad de los botones de eliminar fila.
+ * 
+ * Lógica:
+ * - Si hay más de 1 fila: botones visibles
+ * - Si hay solo 1 fila: botones ocultos (no se puede eliminar)
+ */
 function updateRemoveButtons() {
     const container = document.getElementById('day-module-container');
     const rows = container.querySelectorAll('.day-module-row');
@@ -671,10 +991,30 @@ function updateRemoveButtons() {
     });
 }
 
-// --- EDITAR / ELIMINAR BLOQUES DESDE EL HORARIO ---
+// ===================================
+// EDICIÓN DE BLOQUES EXISTENTES
+// ===================================
 
-let currentEditBlock = null;
+let currentEditBlock = null;  // Almacena datos del bloque siendo editado
 
+/**
+ * Abre el modal de edición para un bloque existente.
+ * 
+ * @param {string} careerCode - Código de la carrera
+ * @param {string} malla - Malla curricular
+ * @param {number} semestre - Número de semestre
+ * @param {string} dia - Día de la semana
+ * @param {number} modulo - Número de módulo (1-8)
+ * @param {string} nrc - NRC de la asignatura
+ * @param {string} seccion - Sección del curso
+ * 
+ * Busca:
+ * - Bloque completo en careerDatabase para obtener todos sus datos
+ * 
+ * Precarga:
+ * - Campos de información (disabled): código materia, n° curso, NRC, sección
+ * - Campos editables: día, módulo, tipo
+ */
 function openEditBlockModal(careerCode, malla, semestre, dia, modulo, nrc, seccion) {
     // Buscar el bloque en la base local para obtener todos sus datos
     let tipo = 'TEO';
@@ -720,6 +1060,27 @@ function openEditBlockModal(careerCode, malla, semestre, dia, modulo, nrc, secci
     document.getElementById('modal-edit-block').classList.remove('hidden');
 }
 
+/**
+ * Guarda los cambios de un bloque editado.
+ * 
+ * Permite modificar:
+ * - Día de la semana
+ * - Módulo horario
+ * - Tipo de clase (TEO/LAB/TAL/SIM)
+ * 
+ * NO modifica:
+ * - NRC
+ * - Sección
+ * - Código de materia
+ * - Número de curso
+ * 
+ * Flujo:
+ * 1. Lee nuevos valores del formulario
+ * 2. Envía POST a /edit_block con identificadores old/new
+ * 3. Actualiza careerDatabase local
+ * 4. Rerenderiza grilla y recarga asignaturas
+ * 5. Cierra modal
+ */
 async function saveEditedBlock() {
     if (!currentEditBlock) return;
 
@@ -761,6 +1122,10 @@ async function saveEditedBlock() {
     }
 }
 
+/**
+ * Inicia el proceso de eliminación desde el modal de edición.
+ * Delega a promptDeleteBlock usando el índice del bloque actual.
+ */
 function deleteBlockFromModal() {
     if (!currentEditBlock) return;
     const code = currentEditBlock.careerCode;
@@ -782,9 +1147,21 @@ function deleteBlockFromModal() {
     promptDeleteBlock(matchIndex, code);
 }
 
-// --- AUTOCOMPLETE DE NRC EN MODAL (FILTRADO POR MATERIA Y CURSO) ---
+// ===================================
+// AUTOCOMPLETADO DE NRC (BUSCADOR)
+// ===================================
 
-// Lista de códigos de materia válidos
+/**
+ * Lista de códigos de materia válidos en el sistema.
+ * Usados para autocompletado en el formulario de bloques.
+ * 
+ * Ejemplos:
+ * - OBMA: Matemática
+ * - ICOM: Computación
+ * - INGE: Ingeniería
+ * - MEDI: Medicina
+ * etc.
+ */
 const VALID_SUBJECT_CODES = [
     'OBMA', 'MEVE', 'TMED', 'ADPU', 'ICOM', 'ARQT', 'FIAD', 'DERE', 'EDUC', 'PEDI', 
     'ENFE', 'DBIO', 'PSIC', 'QYFA', 'PEEI', 'FORI', 'LCEN', 'CFIN', 'BCSA', 'MEDI', 
@@ -793,6 +1170,10 @@ const VALID_SUBJECT_CODES = [
     'PTAP', 'IGEE', 'ESAP', 'PEMI'
 ];
 
+/**
+ * Muestra el dropdown de códigos de materia.
+ * Construye las opciones y lo hace visible.
+ */
 function showSubjectCodes() {
     const container = document.getElementById('subject-code-options');
     if (container) {
@@ -801,6 +1182,10 @@ function showSubjectCodes() {
     }
 }
 
+/**
+ * Oculta el dropdown de códigos de materia con delay.
+ * Permite hacer clic en opciones antes de que desaparezca.
+ */
 function hideSubjectCodesDelayed() {
     setTimeout(() => {
         const container = document.getElementById('subject-code-options');
@@ -808,6 +1193,10 @@ function hideSubjectCodesDelayed() {
     }, 200);
 }
 
+/**
+ * Construye la lista de opciones de códigos de materia.
+ * Crea un elemento clickeable por cada código válido.
+ */
 function buildSubjectCodeOptions() {
     const container = document.getElementById('subject-code-options');
     if (!container) return;
@@ -827,6 +1216,15 @@ function buildSubjectCodeOptions() {
     });
 }
 
+/**
+ * Filtra los códigos de materia según el texto ingresado.
+ * 
+ * Funcionalidad:
+ * - Convierte input a mayúsculas automáticamente
+ * - Filtra lista de códigos válidos
+ * - Muestra/oculta dropdown según resultados
+ * - Dispara filtrado de NRCs cuando cambia el código
+ */
 function filterSubjectCodes() {
     const input = document.getElementById('block-subject-code');
     const container = document.getElementById('subject-code-options');
@@ -864,6 +1262,22 @@ function filterSubjectCodes() {
     filterNrcBySubject();
 }
 
+/**
+ * Filtra los NRCs disponibles según código de materia y número de curso.
+ * 
+ * Lógica:
+ * 1. Si no hay código + curso: muestra input libre
+ * 2. Si no hay datos en globalGroupsData: muestra input libre
+ * 3. Si hay coincidencias: crea select con opciones filtradas
+ * 4. Si no hay coincidencias: muestra input libre
+ * 
+ * Fuente de datos:
+ * - window.globalGroupsData: Array con datos del Excel de grupos
+ * 
+ * Efecto UI:
+ * - Alterna entre input libre (block-nrc-input) y select (block-nrc-select)
+ * - Autocompleta sección al seleccionar NRC
+ */
 function filterNrcBySubject() {
     const subjectCode = document.getElementById('block-subject-code').value.trim().toUpperCase();
     const courseNumber = document.getElementById('block-course-number').value.trim();
@@ -934,11 +1348,19 @@ function filterNrcBySubject() {
     });
 }
 
+/**
+ * Manejador para input libre de NRC.
+ * Permite escritura libre sin restricciones.
+ */
 function handleNrcInput() {
     // Esta función se llama cuando el usuario escribe en el campo NRC libre
     // No hace nada especial, solo permite escritura libre
 }
 
+/**
+ * Actualiza el campo de sección según el NRC seleccionado.
+ * Lee el valor JSON del select y extrae la sección.
+ */
 function updateSectionFromNrc() {
     const nrcSelect = document.getElementById('block-nrc-select');
     const secInput = document.getElementById('block-sec');
@@ -959,11 +1381,23 @@ function updateSectionFromNrc() {
     }
 }
 
-// --- ELIMINACIÓN DE BLOQUES (CARRERAS) ---
+// ===================================
+// ELIMINACIÓN DE BLOQUES
+// ===================================
 
-let blockIndexToDelete = null;
-let blockCareerForDeletion = null;
+let blockIndexToDelete = null;  // Índice del bloque a eliminar
+let blockCareerForDeletion = null;  // Código de carrera del bloque
 
+/**
+ * Abre el modal de confirmación para eliminar un bloque.
+ * 
+ * @param {number} index - Índice del bloque en el array de planificación
+ * @param {string} careerCode - Código de la carrera (opcional, se infiere del selector)
+ * 
+ * Seguridad:
+ * - Requiere confirmación explícita del usuario
+ * - Almacena temporalmente índice y código de carrera
+ */
 function promptDeleteBlock(index, careerCode = null) {
     blockIndexToDelete = index;
     const selector = document.getElementById('schedule-career-selector');
@@ -976,6 +1410,19 @@ function promptDeleteBlock(index, careerCode = null) {
     }
 }
 
+/**
+ * Ejecuta la eliminación del bloque pendiente.
+ * 
+ * Flujo:
+ * 1. Envía POST a /delete_planning_block con índice del bloque
+ * 2. Actualiza careerDatabase local
+ * 3. Rerenderiza grilla
+ * 4. Recarga asignaturas (actualiza subjects.js)
+ * 5. Cierra modales de confirmación y edición
+ * 6. Limpia variables temporales
+ * 
+ * ADVERTENCIA: Eliminación permanente sin deshacer
+ */
 async function confirmPlanningBlockDelete() {
     const targetCareer = blockCareerForDeletion;
 
@@ -1021,12 +1468,30 @@ async function confirmPlanningBlockDelete() {
     }
 }
 
+/**
+ * Manejador para cambios en los selectores de la vista planificador.
+ * Actualiza el estado del botón de añadir y rerenderiza la grilla.
+ */
 function handleScheduleSelectorChange() {
     updateAddButtonState();
     renderCareerGrid();
 }
 
-// --- FUNCIONES PARA MANEJO DE MALLAS ---
+// ===================================
+// GESTIÓN DE MALLAS CURRICULARES
+// ===================================
+
+/**
+ * Renderiza checkboxes para las mallas curriculares de una carrera.
+ * 
+ * @param {string} containerId - ID del contenedor HTML
+ * @param {Array<string>} selectedMeshes - Array con años de mallas activas
+ * 
+ * Características:
+ * - Ordena mallas de mayor a menor (más reciente primero)
+ * - Todas vienen marcadas por defecto
+ * - Muestra mensaje si no hay mallas configuradas
+ */
 function renderMeshCheckboxes(containerId, selectedMeshes = []) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -1061,6 +1526,12 @@ function renderMeshCheckboxes(containerId, selectedMeshes = []) {
     }
 }
 
+/**
+ * Obtiene las mallas curriculares seleccionadas de un contenedor.
+ * 
+ * @param {string} containerId - ID del contenedor con checkboxes
+ * @returns {Array<string>} - Array con años de mallas marcadas, ordenados
+ */
 function getSelectedMeshes(containerId) {
     const container = document.getElementById(containerId);
     if (!container) return [];
@@ -1069,8 +1540,12 @@ function getSelectedMeshes(containerId) {
     return Array.from(checkboxes).map(cb => cb.value).sort((a, b) => b - a);
 }
 
-let currentMeshContainer = null; // Variable para saber a qué contenedor agregar la malla
+let currentMeshContainer = null;  // Almacena a qué contenedor agregar la nueva malla
 
+/**
+ * Abre el modal para agregar una nueva malla curricular.
+ * Se usa desde el modal de crear carrera.
+ */
 function addNewMesh() {
     currentMeshContainer = 'cfg-meshes-container';
     document.getElementById('modal-add-mesh').classList.remove('hidden');
@@ -1078,6 +1553,9 @@ function addNewMesh() {
     document.getElementById('new-mesh-year').focus();
 }
 
+/**
+ * Similar a addNewMesh pero se usa desde el modal de editar carrera.
+ */
 function addNewMeshToEdit() {
     currentMeshContainer = 'edit-meshes-container';
     document.getElementById('modal-add-mesh').classList.remove('hidden');
@@ -1085,11 +1563,26 @@ function addNewMeshToEdit() {
     document.getElementById('new-mesh-year').focus();
 }
 
+/**
+ * Cierra el modal de añadir malla y limpia el estado.
+ */
 function closeMeshModal() {
     document.getElementById('modal-add-mesh').classList.add('hidden');
     currentMeshContainer = null;
 }
 
+/**
+ * Confirma y añade una nueva malla curricular al listado.
+ * 
+ * Validaciones:
+ * - Año debe ser numérico
+ * - No puede duplicar mallas existentes
+ * 
+ * Efecto:
+ * - Crea checkbox marcado con el nuevo año
+ * - Elimina mensaje de "no hay mallas" si existe
+ * - Inserta al inicio de la lista (más reciente primero)
+ */
 function confirmAddMesh() {
     const newMesh = document.getElementById('new-mesh-year').value.trim();
     

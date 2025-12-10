@@ -1,11 +1,48 @@
-// rooms.js - Lógica Específica del Módulo de Salas
-let globalData = null;
-let sortDirection = 'asc'; 
-let currentHighlight = null; 
-let roomPendingDelete = null; 
-let blockToDelete = null; // Para seguimiento de bloque a eliminar
+/**
+ * rooms.js - Módulo de Gestión de Salas y Horarios
+ * ==================================================
+ * 
+ * Estado: COMPLETAMENTE FUNCIONAL ✅
+ * 
+ * Este módulo maneja toda la lógica del lado del cliente para:
+ * - Carga y procesamiento de archivos Excel con horarios
+ * - Visualización de ocupación de salas con gráficos
+ * - Buscador de salas disponibles por día/módulo/categoría
+ * - Visualizador de horarios por sala (grilla semanal)
+ * - CRUD de salas (añadir, eliminar)
+ * - Asignación manual de asignaturas a salas
+ * - Reportes de NRCs sin sala y asignaturas sin docente
+ * 
+ * Variables globales:
+ * - globalData: Almacena todos los datos procesados del Excel
+ * - sortDirection: Dirección de ordenamiento ('asc'/'desc')
+ * - currentHighlight: Celda resaltada en el visualizador de horarios
+ * - roomPendingDelete: Sala pendiente de confirmación de eliminación
+ * - blockToDelete: Bloque de horario pendiente de eliminación
+ * 
+ * Dependencias:
+ * - main.js: toggleLoading(), showStatusModal()
+ * - Chart.js: Para gráficos de ocupación
+ * - Lucide Icons: Iconografía
+ */
 
-// --- UTILIDADES DEL MÓDULO ---
+// ===================================
+// VARIABLES GLOBALES DEL MÓDULO
+// ===================================
+let globalData = null;  // Datos completos del Excel procesado (stats + schedule)
+let sortDirection = 'asc';  // Dirección de ordenamiento de tabla
+let currentHighlight = null;  // {day: string, mod: number} para resaltar celda
+let roomPendingDelete = null;  // Código de sala a eliminar (para confirmación)
+let blockToDelete = null;  // Datos del bloque a eliminar
+
+// ===================================
+// UTILIDADES Y NAVEGACIÓN DEL MÓDULO
+// ===================================
+
+/**
+ * Maneja el clic en el botón del módulo de salas.
+ * Decide si mostrar la vista de ocupación (si hay datos) o la vista de carga.
+ */
 function handleRoomsClick() {
     if (globalData) {
         switchTab('occupancy');
@@ -18,12 +55,23 @@ function handleRoomsClick() {
     }
 }
 
+/**
+ * Limpia los resaltados de salas y cierra el panel de detalles.
+ * Se llama al cambiar de vista para resetear el estado visual.
+ */
 function resetRoomHighlights() {
     currentHighlight = null;
     closeDetailsPanel();
 }
 
-// --- CARGA DE ARCHIVOS ---
+// ===================================
+// CARGA Y PROCESAMIENTO DE ARCHIVOS
+// ===================================
+
+/**
+ * Muestra una vista previa del nombre del archivo seleccionado.
+ * Actualiza la UI para mostrar qué archivo se va a subir.
+ */
 function previewFile() {
     const input = document.getElementById('excelFile');
     const display = document.getElementById('file-name-display');
@@ -33,6 +81,21 @@ function previewFile() {
     }
 }
 
+/**
+ * Sube el archivo Excel al backend y procesa la respuesta.
+ * 
+ * Flujo:
+ * 1. Crea FormData con el archivo seleccionado
+ * 2. Envía POST a /upload
+ * 3. Procesa respuesta del servidor
+ * 4. Actualiza UI con datos procesados
+ * 5. Genera visualizaciones (gráficos, tablas)
+ * 
+ * Manejo de errores:
+ * - Errores de red: Muestra modal de error de conexión
+ * - Errores del servidor: Muestra mensaje específico del backend
+ * - Errores de UI: Log en consola pero continúa ejecución
+ */
 async function uploadFileToBackend() {
     const input = document.getElementById('excelFile');
     const formData = new FormData();
@@ -82,7 +145,15 @@ async function uploadFileToBackend() {
     }
 }
 
-// --- GESTIÓN DE SALAS (CRUD) ---
+// ===================================
+// GESTIÓN DE SALAS (CRUD)
+// ===================================
+
+/**
+ * Muestra u oculta el modal para añadir una nueva sala.
+ * 
+ * @param {boolean} show - true para mostrar, false para ocultar
+ */
 function toggleAddRoomModal(show) {
     const modal = document.getElementById('modal-add-room');
     if (!modal) return;
@@ -95,6 +166,17 @@ function toggleAddRoomModal(show) {
     }
 }
 
+/**
+ * Envía los datos de una nueva sala al backend.
+ * Valida que el nombre no esté vacío antes de enviar.
+ * 
+ * Actualiza:
+ * - Cierra el modal
+ * - Limpia el formulario
+ * - Muestra mensaje de éxito
+ * 
+ * NOTA: La sala se añade solo en memoria y se pierde al cerrar la app.
+ */
 async function submitNewRoom() {
     const name = document.getElementById('input-room-name').value;
     const cap = document.getElementById('input-room-cap').value;
