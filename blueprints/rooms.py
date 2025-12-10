@@ -1,12 +1,44 @@
+"""
+Módulo de Gestión de Salas y Horarios
+======================================
+
+Este módulo maneja toda la lógica relacionada con:
+- Gestión de salas (CRUD completo)
+- Procesamiento de archivos Excel con horarios
+- Visualización de ocupación y disponibilidad
+- Reportes de NRCs sin sala y asignaturas sin docente
+- Asignación manual de asignaturas a salas
+
+Estado: COMPLETAMENTE FUNCIONAL ✅
+
+Endpoints principales:
+- POST /upload: Carga y procesa archivo Excel
+- POST /add_room: Añade nueva sala
+- POST /delete_room: Elimina sala
+- POST /assign_subject: Asignación manual
+- POST /delete_assignment: Elimina asignación
+- GET /unassigned_nrcs: Lista NRCs sin sala
+- GET /rooms_without_teacher: Lista asignaturas sin docente
+"""
+
 # blueprints/rooms.py
 import os
 from flask import Blueprint, request, jsonify, current_app
 import pandas as pd
 
-# Definimos el Blueprint
+# ===================================
+# INICIALIZACIÓN DEL BLUEPRINT
+# ===================================
 rooms_bp = Blueprint("rooms", __name__)
 
-# --- BASE DE DATOS DE SALAS (Mantenemos tu lista completa) ---
+# ===================================
+# BASE DE DATOS DE SALAS
+# ===================================
+# Diccionario con todas las salas disponibles en la institución
+# Estructura: "CODIGO_SALA": {"cap": capacidad, "cat": categoría}
+# 
+# NOTA: Esta base de datos está en memoria y se reinicia al cerrar la app.
+# Para persistencia, migrar a base de datos SQL (ver Roadmap en README)
 ROOM_DATABASE = {
     "A102": {"cap": 48, "cat": "Laboratorio"},
     "A210": {"cap": 30, "cat": "Sala"},
@@ -124,11 +156,40 @@ ROOM_DATABASE = {
     "B204": {"cap": 30, "cat": "Laboratorio"},
 }
 
-EXTRA_SCHEDULE = []
-DELETED_ENTRIES = []
+# ===================================
+# ALMACENAMIENTO TEMPORAL EN MEMORIA
+# ===================================
+# ADVERTENCIA: Estos datos se pierden al cerrar la aplicación
+EXTRA_SCHEDULE = []  # Almacena asignaciones manuales realizadas por el usuario
+DELETED_ENTRIES = []  # Registra entradas eliminadas para no mostrarlas nuevamente
 
+
+# ===================================
+# FUNCIONES DE PROCESAMIENTO DE DATOS
+# ===================================
 
 def normalize_columns(df):
+    """
+    Normaliza las columnas del DataFrame de Excel para trabajar con nombres estándar.
+    
+    Proceso:
+    1. Convierte nombres a minúsculas y elimina espacios
+    2. Mapea nombres comunes del Excel a nombres internos consistentes
+    
+    Args:
+        df (DataFrame): DataFrame de pandas con datos del Excel
+        
+    Returns:
+        DataFrame: DataFrame con columnas normalizadas
+        
+    Columnas esperadas en Excel:
+        - NOMBRE/nombre_asignatura: Nombre de la asignatura
+        - SALA/ubicacion: Código de la sala
+        - HR_INICIO/inicio: Hora de inicio
+        - HR_FIN/fin: Hora de término
+        - NRC: Número de referencia del curso
+        - SECCION/sección: Sección del curso
+    """
     df.columns = df.columns.str.strip().str.lower()
     column_mapping = {
         "nombre": "nombre_asignatura",
@@ -153,6 +214,30 @@ def normalize_columns(df):
 
 
 def get_affected_modules(start_str, end_str):
+    """
+    Determina qué módulos académicos ocupa una clase según su horario.
+    
+    La institución trabaja con 8 módulos de 80 minutos cada uno:
+    - M1: 08:00 - 09:20
+    - M2: 09:30 - 10:50
+    - M3: 11:00 - 12:20
+    - M4: 12:30 - 13:50
+    - M5: 14:00 - 15:20
+    - M6: 15:30 - 16:50
+    - M7: 17:00 - 18:20
+    - M8: 18:30 - 19:50
+    
+    Args:
+        start_str (str): Hora de inicio (ej: "08:00" o "800")
+        end_str (str): Hora de término (ej: "09:20" o "920")
+        
+    Returns:
+        list: Lista de números de módulo que la clase ocupa (ej: [1, 2])
+        
+    Ejemplos:
+        - Clase de 08:00 a 10:50 -> [1, 2] (ocupa 2 módulos)
+        - Clase de 14:00 a 15:20 -> [5] (ocupa 1 módulo)
+    """
     try:
         s_raw = str(start_str).strip().replace(".0", "")
         e_raw = str(end_str).strip().replace(".0", "")
@@ -161,6 +246,7 @@ def get_affected_modules(start_str, end_str):
         start_val = int(s_clean)
         end_val = int(e_clean)
 
+        # Detectar clases de 2 módulos seguidos (casos especiales)
         if start_val == 800 and (1035 <= end_val <= 1045):
             return [1, 2]
         if start_val == 930 and (1205 <= end_val <= 1215):
@@ -172,6 +258,7 @@ def get_affected_modules(start_str, end_str):
         if start_val == 1700 and (1935 <= end_val <= 1945):
             return [7, 8]
 
+        # Asignar módulo individual según hora de inicio
         affected = []
         if 800 <= start_val <= 925:
             affected.append(1)
@@ -195,6 +282,25 @@ def get_affected_modules(start_str, end_str):
 
 
 def calculate_occupancy_color(blocks_used):
+    """
+    Calcula el estado de ocupación de una sala según bloques ocupados.
+    
+    Criterios de clasificación:
+    - Libre (verde): < 15 bloques ocupados (menos del 31% de 48 bloques semanales)
+    - Normal (amarillo): 15-29 bloques (31-60%)
+    - Saturada (rojo): >= 30 bloques (más del 62%)
+    
+    Total de bloques disponibles: 48 (8 módulos × 6 días)
+    
+    Args:
+        blocks_used (int): Número de bloques ocupados en la semana
+        
+    Returns:
+        tuple: (clase_css, texto_estado, color_punto)
+            - clase_css: Clase CSS para styling
+            - texto_estado: Texto descriptivo del estado
+            - color_punto: Clase Tailwind para el indicador visual
+    """
     if blocks_used >= 30:
         return "ocup-high", "Saturada", "bg-red-500"
     elif blocks_used >= 15:

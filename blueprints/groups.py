@@ -1,16 +1,92 @@
+"""
+Módulo Generador de Bloques para Estudiantes de Primer Año
+============================================================
+
+Este módulo procesa archivos Excel con datos de nuevo ingreso y genera
+bloques de estudiantes optimizando la asignación a secciones.
+
+Funcionalidad:
+- Procesa Excel con datos de asignaturas y vacantes
+- Filtra estudiantes de nuevo ingreso (NI)
+- Genera bloques considerando:
+  * Vacantes disponibles por sección
+  * Conflictos de horario
+  * Distribución equitativa de estudiantes
+
+Estado: EXPERIMENTAL - NO FUNCIONAL 🔴
+
+⚠️ ADVERTENCIA CRÍTICA:
+Este módulo NO funciona correctamente y NO debe usarse en producción.
+
+Problemas identificados:
+- El algoritmo no refleja el proceso real de Registro Académico
+- Las reglas de asignación necesitan validación institucional
+- Los criterios de optimización no están alineados con políticas reales
+- Falta validación de casos especiales
+
+Trabajo requerido:
+1. Reuniones con Registro Académico para documentar proceso real
+2. Rediseño completo del algoritmo de asignación
+3. Validación iterativa con datos históricos
+4. Testing exhaustivo antes de uso real
+
+Ver README.md sección "Limitaciones Actuales" para detalles completos.
+
+Endpoint:
+- POST /groups/upload: Procesa archivo Excel de nuevo ingreso
+"""
+
 import os
 from flask import Blueprint, request, jsonify, current_app
 import pandas as pd
 import math
 
+# ===================================
+# INICIALIZACIÓN DEL BLUEPRINT
+# ===================================
 groups_bp = Blueprint("groups", __name__)
 
 
+# ===================================
+# FUNCIONES DE NORMALIZACIÓN DE DATOS
+# ===================================
+
 def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normaliza las columnas del DataFrame de Excel para generación de bloques.
+    
+    Este proceso es crítico para asegurar que el algoritmo pueda leer
+    correctamente los datos independientemente del formato del Excel.
+    
+    Proceso:
+    1. Convierte nombres a minúsculas y elimina espacios
+    2. Maneja columnas conflictivas (vacantes, carrera)
+    3. Mapea nombres del Excel a nombres internos estándar
+    
+    Args:
+        df (DataFrame): DataFrame de pandas con datos del Excel
+        
+    Returns:
+        DataFrame: DataFrame con columnas normalizadas
+        
+    Columnas requeridas en Excel:
+        - NOMBRE: Nombre de la asignatura
+        - NRC: Número de referencia del curso
+        - SECCION: Sección del curso
+        - N_CURSO: Número de curso
+        - COMPONENTE/TIPO: Tipo de actividad (TEO, LAB, TAL, SIM)
+        - SALA: Código de la sala
+        - HR_INICIO/HR_FIN: Horas de inicio y término
+        - CARRERA_RESERVA: Código de la carrera
+        - NI_AN: Indicador de nuevo ingreso (debe ser "NI")
+        - CUPO_DISP/VACANTES: Vacantes disponibles
+        - Días de la semana: LUNES, MARTES, MIERCOLES, etc.
+    """
     # 1. Limpieza inicial: minúsculas y quitar espacios
     df.columns = df.columns.str.strip().str.lower()
 
     # 2. Renombrar columnas conflictivas si existen
+    # Esto previene problemas cuando hay múltiples columnas con nombres similares
     if "vacantes" in df.columns:
         # Si existe una columna llamada explícitamente 'vacantes' que NO es la que queremos, la apartamos
         df.rename(columns={"vacantes": "vacantes_original"}, inplace=True)
@@ -18,7 +94,8 @@ def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
     if "carrera" in df.columns and "carrera_reserva" in df.columns:
         df.rename(columns={"carrera": "carrera_original"}, inplace=True)
 
-    # 3. Mapeo Oficial
+    # 3. Mapeo Oficial de columnas
+    # Este diccionario traduce los nombres del Excel a nombres internos consistentes
     mapping = {
         # --- ASIGNATURA ---
         "nombre": "nombre_asignatura",
@@ -27,7 +104,8 @@ def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
         "seccion": "seccion",
         "sección": "seccion",
         "n_curso": "n_curso",
-        # --- TIPO DE ASIGNATURA (Aquí estaba el problema) ---
+        # --- TIPO DE ASIGNATURA ---
+        # CRÍTICO: COMPONENTE debe mapearse a TIPO para que el algoritmo funcione
         "componente": "tipo",  # MAPEO CLAVE: COMPONENTE -> TIPO
         "tipo": "tipo",
         "tip": "tipo",
@@ -61,6 +139,20 @@ def normalize_groups_columns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def normalize_time_format(time_str: str) -> str:
+    """
+    Normaliza el formato de hora a HH:MM.
+    
+    Maneja diferentes formatos comunes del Excel:
+    - "800" o "8:00" -> "08:00"
+    - "1430" -> "14:30"
+    - "9:30" -> "09:30"
+    
+    Args:
+        time_str (str): Cadena con la hora en cualquier formato
+        
+    Returns:
+        str: Hora en formato HH:MM o cadena vacía si inválido
+    """
     time_str = str(time_str).strip().replace(".0", "")
     if not time_str or time_str.lower() == "nan":
         return ""
@@ -74,6 +166,25 @@ def normalize_time_format(time_str: str) -> str:
 
 
 def get_module_from_time(time_str: str) -> int:
+    """
+    Determina el número de módulo académico según la hora de inicio.
+    
+    Módulos académicos:
+    - M1: 08:00
+    - M2: 09:30
+    - M3: 11:00
+    - M4: 12:30
+    - M5: 14:00
+    - M6: 15:30
+    - M7: 17:00
+    - M8: 18:30
+    
+    Args:
+        time_str (str): Hora de inicio (ej: "08:00")
+        
+    Returns:
+        int: Número de módulo (1-8) o 0 si no coincide con ningún módulo
+    """
     time_str = normalize_time_format(time_str)
     if time_str.startswith("08:00") or time_str.startswith("8:00"):
         return 1

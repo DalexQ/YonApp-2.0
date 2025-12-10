@@ -1,21 +1,68 @@
-// main.js - Lógica Global y de Navegación
+/**
+ * main.js - Lógica Global y Sistema de Navegación
+ * ================================================
+ * 
+ * Este archivo maneja la navegación entre módulos y vistas de la aplicación.
+ * También controla el sistema de sidebar dinámico y la gestión de tabs.
+ * 
+ * Funciones principales:
+ * - Gestión de login (simulado)
+ * - Navegación entre módulos (Salas, Carreras, Dashboard)
+ * - Sistema de tabs dinámico
+ * - Sidebar adaptativo según módulo activo
+ * - Hooks para cargar datos específicos de cada vista
+ * 
+ * Dependencias:
+ * - Lucide Icons: Para iconografía
+ * - rooms.js: Funciones del módulo de salas
+ * - careers.js: Funciones del módulo de carreras
+ * - subjects.js: Funciones del buscador de asignaturas
+ */
+
+// Inicializar iconos de Lucide al cargar el script
 lucide.createIcons();
 
-// --- LÓGICA DE INTERFAZ ---
+// ===================================
+// LÓGICA DE INTERFAZ - LOGIN
+// ===================================
+
+/**
+ * Maneja el proceso de "login" simulado.
+ * NOTA: Este es un login ficticio sin autenticación real.
+ * Ver README.md sobre implementación de autenticación real pendiente.
+ * 
+ * @param {Event} e - Evento del formulario
+ */
 function handleLogin(e) {
     e.preventDefault();
+    // Ocultar pantalla de login
     document.getElementById('view-login').classList.add('hidden');
+    // Mostrar layout principal de la aplicación
     document.getElementById('main-layout').classList.remove('hidden');
 }
 
-// --- GESTIÓN DE NAVEGACIÓN Y SIDEBAR ---
+// ===================================
+// GESTIÓN DE NAVEGACIÓN Y SIDEBAR
+// ===================================
+
+/**
+ * Cambia el contenido del sidebar según el módulo activo.
+ * Cada módulo tiene su propio conjunto de opciones de navegación.
+ * 
+ * Modos disponibles:
+ * - 'root': Vista principal con acceso a todos los módulos
+ * - 'rooms': Navegación específica del módulo de salas
+ * - 'careers': Navegación específica del módulo de carreras
+ * 
+ * @param {string} mode - Modo del sidebar ('root', 'rooms', 'careers')
+ */
 function setSidebarMode(mode) {
-    // Ocultar todos los menús
+    // Ocultar todos los menús del sidebar
     document.getElementById('nav-root').classList.add('hidden');
     document.getElementById('nav-rooms').classList.add('hidden');
     document.getElementById('nav-careers').classList.add('hidden');
 
-    // Mostrar el correspondiente
+    // Mostrar el menú correspondiente al modo seleccionado
     if (mode === 'root') {
         document.getElementById('nav-root').classList.remove('hidden');
     } else if (mode === 'rooms') {
@@ -23,17 +70,25 @@ function setSidebarMode(mode) {
     } else if (mode === 'careers') {
         document.getElementById('nav-careers').classList.remove('hidden');
     }
+    
+    // Reinicializar iconos después de cambiar contenido del DOM
     lucide.createIcons(); 
 }
 
+/**
+ * Entra a un módulo específico de la aplicación.
+ * Configura el sidebar y navega a la vista inicial del módulo.
+ * 
+ * @param {string} moduleName - Nombre del módulo ('rooms' o 'careers')
+ */
 function enterModule(moduleName) {
     if (moduleName === 'rooms') {
         setSidebarMode('rooms');
-        // Llamamos a la función que vive en rooms.js
+        // Llamar a función del módulo de salas (definida en rooms.js)
         if (typeof handleRoomsClick === 'function') {
             handleRoomsClick();
         } else {
-            switchTab('upload'); // Fallback
+            switchTab('upload'); // Fallback si la función no existe
         }
     } else if (moduleName === 'careers') {
         setSidebarMode('careers');
@@ -41,13 +96,22 @@ function enterModule(moduleName) {
     }
 }
 
+/**
+ * Regresa al dashboard principal desde cualquier módulo.
+ */
 function goBackToRoot() {
     setSidebarMode('root');
     switchTab('dashboard');
 }
 
+/**
+ * Cambia entre las diferentes vistas/tabs de la aplicación.
+ * También maneja la carga de datos específicos de cada vista.
+ * 
+ * @param {string} tabId - ID de la vista a mostrar (sin prefijo 'tab-')
+ */
 function switchTab(tabId) {
-    // Si existe la función de limpiar highlights (en rooms.js), la llamamos
+    // Limpiar highlights de salas si existe la función (en rooms.js)
     if (typeof resetRoomHighlights === 'function') {
         resetRoomHighlights();
     }
@@ -160,10 +224,6 @@ document.addEventListener('DOMContentLoaded', () => {
         (async () => {
             const type = async (t) => { for(let c of t) { target.innerText += c; await new Promise(r=>setTimeout(r,100)); }};
             const del = async () => { while(target.innerText.length > 0) { target.innerText = target.innerText.slice(0,-1); await new Promise(r=>setTimeout(r,50)); }};
-            await new Promise(r=>setTimeout(r,500));
-            await type("Yonathan A");
-            await new Promise(r=>setTimeout(r,300));
-            await del();
             await new Promise(r=>setTimeout(r,300));
             await type("✨Your on-campus network✨");
         })();

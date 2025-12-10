@@ -1,8 +1,54 @@
+"""
+Módulo de Gestión de Carreras y Planificación Académica
+========================================================
+
+Este módulo maneja:
+- CRUD de carreras universitarias
+- Configuración de períodos académicos (semestres pares/impares)
+- Planificación de horarios por carrera/malla/semestre
+- Gestión de bloques de clases (añadir, editar, eliminar)
+- Detección de conflictos de horario
+
+Estado: EN DESARROLLO ⚠️
+
+ADVERTENCIA: Este módulo requiere mejoras significativas:
+- Sistema de autenticación con roles de usuario
+- Base de datos persistente (actualmente en memoria)
+- Arquitectura cliente-servidor para múltiples usuarios
+Ver README.md sección "Limitaciones Actuales" para más detalles.
+
+Endpoints principales:
+- GET /get_careers: Obtiene todas las carreras
+- POST /set_planning_period: Configura período académico
+- POST /save_career: Crea o actualiza carrera
+- POST /delete_career: Elimina carrera
+- POST /add_block: Añade bloque de horario
+- POST /edit_block: Edita bloque existente
+- POST /delete_planning_block: Elimina bloque
+"""
+
 from flask import Blueprint, request, jsonify
 
+# ===================================
+# INICIALIZACIÓN DEL BLUEPRINT
+# ===================================
 careers_bp = Blueprint("careers", __name__)
 
-# --- BASE DE DATOS DE CARRERAS ---
+# ===================================
+# BASE DE DATOS DE CARRERAS
+# ===================================
+# Diccionario con todas las carreras de la institución
+# Estructura: {
+#   "CODIGO": {
+#     "nombre": str,
+#     "semestres": int,
+#     "mallas": list,  # Años de las mallas curriculares activas
+#     "planificacion": list  # Bloques de horario planificados
+#   }
+# }
+#
+# NOTA: Estos datos están en memoria y se pierden al cerrar la aplicación.
+# Para persistencia, migrar a base de datos SQL (ver Roadmap en README)
 CAREER_DATABASE = {
     "ENFE": {
         "nombre": "Enfermería",
@@ -132,12 +178,34 @@ CAREER_DATABASE = {
     },
 }
 
-# 1 = Primer Semestre (Impares), 2 = Segundo Semestre (Pares)
+# ===================================
+# CONFIGURACIÓN DE PERÍODO ACADÉMICO
+# ===================================
+# Indica qué semestres están activos en el período de planificación actual
+# 1 = Primer Semestre (semestres impares: 1, 3, 5, 7, 9)
+# 2 = Segundo Semestre (semestres pares: 2, 4, 6, 8, 10)
+# 
+# Esto permite filtrar en la interfaz solo los semestres relevantes
+# para el período que se está planificando
 PLANNING_PERIOD = 1
 
 
+# ===================================
+# ENDPOINTS DE CARRERAS
+# ===================================
+
 @careers_bp.route("/get_careers", methods=["GET"])
 def get_careers():
+    """
+    Obtiene todas las carreras disponibles y el período de planificación actual.
+    
+    Returns:
+        JSON: {
+            "success": true,
+            "data": CAREER_DATABASE,
+            "period": PLANNING_PERIOD
+        }
+    """
     return jsonify(
         {"success": True, "data": CAREER_DATABASE, "period": PLANNING_PERIOD}
     )
@@ -145,6 +213,20 @@ def get_careers():
 
 @careers_bp.route("/set_planning_period", methods=["POST"])
 def set_planning_period():
+    """
+    Configura el período académico activo (semestre par o impar).
+    
+    Request JSON:
+        {
+            "period": 1 o 2
+        }
+    
+    Returns:
+        JSON: {
+            "success": true,
+            "period": período configurado
+        }
+    """
     global PLANNING_PERIOD
     data = request.json
     period = int(data.get("period", 1))
